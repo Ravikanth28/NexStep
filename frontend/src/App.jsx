@@ -6,6 +6,7 @@ import QuestionsPage from './pages/QuestionsPage';
 import SolvePage from './pages/SolvePage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import SubmissionReportPage from './pages/SubmissionReportPage';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
@@ -165,6 +166,11 @@ export default function App() {
         <Route path="/progress" element={
           <ProtectedRoute user={user} requiredRole="student">
             <StudentDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/submission-report" element={
+          <ProtectedRoute user={user} requiredRole="student">
+            <SubmissionReportPage />
           </ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />

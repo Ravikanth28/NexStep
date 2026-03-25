@@ -78,7 +78,8 @@ def validate_solution(
         "steps": result["steps"],
         "verdict": result["verdict"],
         "score": score,
-        "correct_answer": result.get("correct_answer")
+        "correct_answer": result.get("correct_answer"),
+        "error": result.get("error")
     }
 
 

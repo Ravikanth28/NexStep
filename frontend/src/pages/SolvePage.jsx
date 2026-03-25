@@ -11,6 +11,7 @@ export default function SolvePage() {
   const [results, setResults] = useState(null);
   const [verdict, setVerdict] = useState(null);
   const [correctAnswer, setCorrectAnswer] = useState(null);
+  const [validationError, setValidationError] = useState('');
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [hint, setHint] = useState('');
@@ -58,13 +59,13 @@ export default function SolvePage() {
   const handleInsertSymbol = (symbol) => {
     const el = textareaRef.current;
     if (!el) return;
+
     const start = el.selectionStart;
     const end = el.selectionEnd;
     const newValue = text.substring(0, start) + symbol + text.substring(end);
     setText(newValue);
     if (!timerActive) setTimerActive(true);
-    
-    // Focus and move cursor
+
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + symbol.length, start + symbol.length);
@@ -72,28 +73,42 @@ export default function SolvePage() {
   };
 
   const handleValidate = async () => {
-    const steps = text.split('\n').map(s => s.trim()).filter(s => s !== '');
+    const steps = text.split('\n').map((s) => s.trim()).filter((s) => s !== '');
     if (steps.length === 0) return;
 
     setValidating(true);
     setResults(null);
     setVerdict(null);
     setCorrectAnswer(null);
+    setValidationError('');
     setTimerActive(false);
 
     try {
-      const data = await validateSteps({ question_id: parseInt(id), steps });
+      const data = await validateSteps({ question_id: parseInt(id, 10), steps });
+      const stepResults = data.steps || [];
 
-      // Animate results sequentially
-      for (let i = 0; i < data.steps.length; i++) {
-        await new Promise((r) => setTimeout(r, 400));
-        setResults((prev) => [...(prev || []), data.steps[i]]);
+      setResults(stepResults);
+      setVerdict(data.verdict || null);
+      setCorrectAnswer(data.correct_answer || null);
+
+      if (data.error) {
+        setValidationError(data.error);
       }
-      await new Promise((r) => setTimeout(r, 500));
-      setVerdict(data.verdict);
-      setCorrectAnswer(data.correct_answer);
+
+      if (stepResults.length === 0 && data.error) {
+        setResults([
+          {
+            step: 1,
+            expression: 'Validation engine error',
+            valid: false,
+            error: data.error,
+          },
+        ]);
+      }
     } catch (err) {
       console.error(err);
+      setResults([]);
+      setValidationError(err.message || 'Validation failed');
     } finally {
       setValidating(false);
     }
@@ -102,9 +117,9 @@ export default function SolvePage() {
   const handleGetHint = async () => {
     setHintLoading(true);
     try {
-      const parsedSteps = text.split('\n').map(s => s.trim()).filter(s => s !== '');
+      const parsedSteps = text.split('\n').map((s) => s.trim()).filter((s) => s !== '');
       const data = await apiGetHint({
-        question_id: parseInt(id),
+        question_id: parseInt(id, 10),
         step_number: parsedSteps.length,
       });
       setHint(data.hint);
@@ -120,18 +135,24 @@ export default function SolvePage() {
     setResults(null);
     setVerdict(null);
     setCorrectAnswer(null);
+    setValidationError('');
     setHint('');
     setTimer(0);
     setTimerActive(false);
   };
 
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`;
   };
 
-  // Derived state for lines
+  const verdictLabel = verdict === 'Correct'
+    ? 'Correct Answer!'
+    : verdict === 'Error'
+      ? 'Validation Error'
+      : 'Incorrect Answer';
+
   const lines = text.split('\n');
 
   if (loading) {
@@ -176,24 +197,23 @@ export default function SolvePage() {
             <div className={`timer ${timer > 300 ? 'danger' : timer > 180 ? 'warning' : ''}`}>
               ⏱ {formatTime(timer)}
             </div>
-            <button className="btn btn-outline btn-sm red" onClick={() => alert("Issue reported to teacher. Thanks for the feedback!")}>
-              🚩 Report Issue
+            <button className="btn btn-outline btn-sm red" onClick={() => alert('Issue reported to teacher. Thanks for the feedback!')}>
+              Report Issue
             </button>
           </div>
         </div>
 
         <div className="solver-layout">
-          {/* Editor Panel */}
           <div className="editor-panel">
             <MathKeyboard onInsert={handleInsertSymbol} />
-            
+
             <div className="editor-header" style={{ marginTop: '16px' }}>
-              <h3>📝 Code Editor (Step-by-Step)</h3>
+              <h3>Code Editor (Step-by-Step)</h3>
               <button className="btn btn-sm btn-outline" onClick={handleReset}>
-                ↺ Reset
+                Reset
               </button>
             </div>
-            
+
             <div className="code-editor-container">
               <div className="line-numbers" ref={lineNumbersRef}>
                 {lines.map((_, i) => (
@@ -208,16 +228,16 @@ export default function SolvePage() {
                 value={text}
                 onChange={handleTextChange}
                 onScroll={handleScroll}
-                onCopy={e => { 
+                onCopy={(e) => {
                   if (question && !question.allow_copy_paste) {
-                    e.preventDefault(); 
-                    alert("Copying is disabled for this question!"); 
+                    e.preventDefault();
+                    alert('Copying is disabled for this question!');
                   }
                 }}
-                onPaste={e => { 
+                onPaste={(e) => {
                   if (question && !question.allow_copy_paste) {
-                    e.preventDefault(); 
-                    alert("Pasting is disabled for this question!"); 
+                    e.preventDefault();
+                    alert('Pasting is disabled for this question!');
                   }
                 }}
                 spellCheck={false}
@@ -225,15 +245,16 @@ export default function SolvePage() {
                 placeholder="Press ENTER to separate steps..."
               />
             </div>
-            
+
             <div className="action-bar" style={{ marginTop: '16px' }}>
               <button className={`btn-run ${validating ? 'running' : ''}`} onClick={handleValidate} disabled={validating || text.trim() === ''}>
-                {validating ? <><div className="spinner"></div> Validating...</> : '▶ Run / Validate'}
+                {validating ? <><div className="spinner"></div> Validating...</> : 'Run / Validate'}
               </button>
               <button className="btn btn-sm btn-outline" onClick={handleGetHint} disabled={hintLoading}>
-                {hintLoading ? 'Loading...' : '💡 Get Hint'}
+                {hintLoading ? 'Loading...' : 'Get Hint'}
               </button>
             </div>
+
             {hint && (
               <div className="hint-box">
                 <span className="hint-icon">💡</span>
@@ -242,7 +263,6 @@ export default function SolvePage() {
             )}
           </div>
 
-          {/* Output Panel */}
           <div className="output-panel">
             <div className="output-console">
               <div className="console-header">
@@ -259,19 +279,28 @@ export default function SolvePage() {
                   </div>
                 ) : (
                   <>
-                    {results.map((r, i) => (
-                      <div key={i} className={`step-result ${r.valid ? 'valid' : 'invalid'}`} style={{ animationDelay: `${i * 0.1}s` }}>
-                        <span className="result-icon">{r.valid ? '✅' : '❌'}</span>
+                    {validationError && (
+                      <div className="step-result invalid">
+                        <span className="result-icon">❌</span>
                         <div>
-                          <span className="step-label">Line {r.step}:</span>{' '}
-                          <span className="step-expr">{r.expression}</span>
-                          {r.error && <div className="step-error">↳ {r.error}</div>}
+                          <span className="step-label">Validation failed:</span>{' '}
+                          <span className="step-expr">{validationError}</span>
+                        </div>
+                      </div>
+                    )}
+                    {results.map((result, index) => (
+                      <div key={index} className={`step-result ${result.valid ? 'valid' : 'invalid'}`} style={{ animationDelay: `${index * 0.1}s` }}>
+                        <span className="result-icon">{result.valid ? '✅' : '❌'}</span>
+                        <div>
+                          <span className="step-label">Line {result.step}:</span>{' '}
+                          <span className="step-expr">{result.expression}</span>
+                          {result.error && <div className="step-error">↳ {result.error}</div>}
                         </div>
                       </div>
                     ))}
                     {verdict && (
                       <div className={`verdict-box ${verdict === 'Correct' ? 'correct' : 'incorrect'}`}>
-                        {verdict === 'Correct' ? '🎉 Correct Answer!' : '❌ Incorrect Answer'}
+                        {verdictLabel}
                         {correctAnswer && (
                           <div className="correct-answer">Correct answer: {correctAnswer}</div>
                         )}
