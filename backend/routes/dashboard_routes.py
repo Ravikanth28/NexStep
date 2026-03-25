@@ -130,3 +130,34 @@ def student_dashboard(
         "question_stats": list(question_stats.values()),
         "recent_submissions": recent
     }
+
+
+from fastapi.responses import StreamingResponse
+import io
+import csv
+
+@router.get("/teacher/report")
+def download_teacher_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can access this report")
+
+    submissions = db.query(Submission).order_by(Submission.submitted_at.desc()).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Submission ID", "Student Username", "Question Title", "Score", "Is Correct", "Submitted At"])
+    
+    for s in submissions:
+        student_name = s.user.username if s.user else "Unknown"
+        question_title = s.question.title if s.question else "Unknown"
+        writer.writerow([s.id, student_name, question_title, s.score, s.is_correct, str(s.submitted_at)])
+        
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=student_performance_report.csv"}
+    )

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createQuestion, getQuestions, deleteQuestion, getTeacherDashboard } from '../api';
+import { createQuestion, getQuestions, deleteQuestion, getTeacherDashboard, downloadTeacherReport } from '../api';
 
 export default function TeacherDashboard() {
   const [tab, setTab] = useState('dashboard');
@@ -86,9 +86,23 @@ export default function TeacherDashboard() {
   return (
     <div className="page">
       <div className="container">
-        <div className="page-header">
-          <h1>Teacher Dashboard</h1>
-          <p>Manage questions and track student progress</p>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <h1>Teacher Dashboard</h1>
+            <p>Manage questions and track student progress</p>
+          </div>
+          <button 
+            className="btn btn-primary" 
+            onClick={async () => {
+              try {
+                await downloadTeacherReport();
+              } catch (err) {
+                alert("Failed to download CSV report.");
+              }
+            }}
+          >
+            📥 Download CSV Report
+          </button>
         </div>
 
         {/* Tabs */}
