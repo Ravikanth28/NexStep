@@ -168,7 +168,7 @@ export default function SolvePage() {
           <div>
             <h1>{question.title}</h1>
             <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.15rem', color: 'var(--accent-primary-hover)', marginTop: '8px' }}>
-              ∫ {question.problem_expr} dx
+              {question.problem_type === 'integral' ? `∫ ${question.problem_expr} dx` : question.problem_expr}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -208,8 +208,18 @@ export default function SolvePage() {
                 value={text}
                 onChange={handleTextChange}
                 onScroll={handleScroll}
-                onCopy={e => { e.preventDefault(); alert("Copying is disabled!"); }}
-                onPaste={e => { e.preventDefault(); alert("Pasting is disabled!"); }}
+                onCopy={e => { 
+                  if (question && !question.allow_copy_paste) {
+                    e.preventDefault(); 
+                    alert("Copying is disabled for this question!"); 
+                  }
+                }}
+                onPaste={e => { 
+                  if (question && !question.allow_copy_paste) {
+                    e.preventDefault(); 
+                    alert("Pasting is disabled for this question!"); 
+                  }
+                }}
                 spellCheck={false}
                 disabled={validating}
                 placeholder="Press ENTER to separate steps..."
