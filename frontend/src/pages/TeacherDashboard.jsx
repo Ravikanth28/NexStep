@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createQuestion, getQuestions, deleteQuestion, getTeacherDashboard } from '../api';
+import { createQuestion, getQuestions, deleteQuestion, getTeacherDashboard, downloadTeacherReport } from '../api';
 
 export default function TeacherDashboard() {
   const [tab, setTab] = useState('dashboard');
@@ -11,7 +11,10 @@ export default function TeacherDashboard() {
   const [title, setTitle] = useState('');
   const [problemExpr, setProblemExpr] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
+  const [topic, setTopic] = useState('Calculus');
+  const [problemType, setProblemType] = useState('integral');
   const [hints, setHints] = useState(['']);
+  const [allowCopyPaste, setAllowCopyPaste] = useState(true);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -46,13 +49,17 @@ export default function TeacherDashboard() {
         title,
         problem_expr: problemExpr,
         difficulty,
+        topic,
+        problem_type: problemType,
         hints: hints.filter((h) => h.trim()),
+        allow_copy_paste: allowCopyPaste,
       });
       setFormSuccess('Question created successfully!');
       setTitle('');
       setProblemExpr('');
       setDifficulty('medium');
       setHints(['']);
+      setAllowCopyPaste(true);
       loadData();
     } catch (err) {
       setFormError(err.message);
@@ -86,9 +93,23 @@ export default function TeacherDashboard() {
   return (
     <div className="page">
       <div className="container">
-        <div className="page-header">
-          <h1>Teacher Dashboard</h1>
-          <p>Manage questions and track student progress</p>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <h1>Teacher Dashboard</h1>
+            <p>Manage questions and track student progress</p>
+          </div>
+          <button 
+            className="btn btn-primary" 
+            onClick={async () => {
+              try {
+                await downloadTeacherReport();
+              } catch (err) {
+                alert("Failed to download CSV report.");
+              }
+            }}
+          >
+            📥 Download CSV Report
+          </button>
         </div>
 
         {/* Tabs */}
@@ -228,10 +249,32 @@ export default function TeacherDashboard() {
                   <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Basic Power Rule" required />
                 </div>
                 <div className="form-group">
-                  <label>Integrand Expression (what's inside ∫ ... dx)</label>
-                  <input value={problemExpr} onChange={(e) => setProblemExpr(e.target.value)} placeholder="e.g. x^2, sin(x), 3*x^2 + 2*x" required style={{ fontFamily: "'JetBrains Mono', monospace" }} />
+                  <label>Syllabus Topic</label>
+                  <select value={topic} onChange={(e) => setTopic(e.target.value)} required>
+                    <option value="Calculus">Calculus</option>
+                    <option value="Matrices">Matrices</option>
+                    <option value="Differential Equations">Differential Equations</option>
+                    <option value="Vector Calculus">Vector Calculus</option>
+                    <option value="Transforms">Transforms</option>
+                    <option value="Probability & Stats">Probability & Stats</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Problem Type</label>
+                  <select value={problemType} onChange={(e) => setProblemType(e.target.value)} required>
+                    <option value="integral">Integral (∫ f(x) dx)</option>
+                    <option value="matrix">Matrix Operation</option>
+                    <option value="ode">Differential Equation</option>
+                    <option value="transform">Transform (Laplace/Fourier)</option>
+                    <option value="vector">Vector Operation</option>
+                    <option value="stats">Statistics / Probability</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Mathematical Expression / Problem Statement</label>
+                  <input value={problemExpr} onChange={(e) => setProblemExpr(e.target.value)} placeholder="e.g. x^2, [[1,2],[3,4]], P(A|B)" required style={{ fontFamily: "'JetBrains Mono', monospace" }} />
                   <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                    Use ^ for exponents, * for multiplication. Examples: x^2, sin(x), exp(x), 1/x
+                    SymPy Syntax: ^ for exponents, * for multiply. Matrices: string notation `[[1,2]]`
                   </small>
                 </div>
                 <div className="form-group">
@@ -243,6 +286,20 @@ export default function TeacherDashboard() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={allowCopyPaste} 
+                      onChange={(e) => setAllowCopyPaste(e.target.checked)}
+                      style={{ width: 'auto', marginBottom: 0 }}
+                    />
+                    <span>Allow students to copy and paste in editor</span>
+                  </label>
+                  <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                    If disabled, students will be blocked from copying/pasting their solution steps.
+                  </small>
                 </div>
                 <div className="form-group">
                   <label>Hints (optional)</label>
@@ -288,7 +345,9 @@ export default function TeacherDashboard() {
                 {questions.map((q, i) => (
                   <div key={q.id} className="question-card" style={{ animationDelay: `${i * 0.08}s` }}>
                     <h3>{q.title}</h3>
-                    <div className="problem">∫ {q.problem_expr} dx</div>
+                    <div className="problem">
+                      {q.problem_type === 'integral' ? `∫ ${q.problem_expr} dx` : q.problem_expr}
+                    </div>
                     <div className="meta">
                       <span className={`badge badge-${q.difficulty}`}>{q.difficulty}</span>
                       <button className="btn btn-sm btn-danger" onClick={() => handleDelete(q.id)}>

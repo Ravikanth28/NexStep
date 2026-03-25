@@ -25,7 +25,10 @@ class Question(Base):
     title = Column(String(200), nullable=False)
     problem_expr = Column(String(500), nullable=False)  # e.g. "x**2"
     difficulty = Column(String(20), default="medium")  # easy, medium, hard
+    topic = Column(String(100), default="Calculus")  # e.g., Matrices, Integral
+    problem_type = Column(String(50), default="integral")  # e.g., integral, matrix, ode
     hints = Column(Text, default="[]")  # JSON array of hints
+    allow_copy_paste = Column(Boolean, default=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

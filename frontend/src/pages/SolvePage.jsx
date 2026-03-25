@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getQuestion, validateSteps, getHint as apiGetHint } from '../api';
+import MathKeyboard from '../components/MathKeyboard';
 
 export default function SolvePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [question, setQuestion] = useState(null);
-  const [steps, setSteps] = useState(['']);
+  const [text, setText] = useState('');
   const [results, setResults] = useState(null);
   const [verdict, setVerdict] = useState(null);
   const [correctAnswer, setCorrectAnswer] = useState(null);
@@ -16,7 +17,8 @@ export default function SolvePage() {
   const [hintLoading, setHintLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
-  const inputRefs = useRef([]);
+  const textareaRef = useRef(null);
+  const lineNumbersRef = useRef(null);
 
   useEffect(() => {
     loadQuestion();
@@ -42,60 +44,36 @@ export default function SolvePage() {
     }
   };
 
-  const updateStep = (index, value) => {
-    const newSteps = [...steps];
-    newSteps[index] = value;
-    setSteps(newSteps);
+  const handleTextChange = (e) => {
+    setText(e.target.value);
     if (!timerActive) setTimerActive(true);
   };
 
-  const addStep = () => {
-    setSteps([...steps, '']);
+  const handleScroll = () => {
+    if (lineNumbersRef.current && textareaRef.current) {
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const handleInsertSymbol = (symbol) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const newValue = text.substring(0, start) + symbol + text.substring(end);
+    setText(newValue);
+    if (!timerActive) setTimerActive(true);
+    
+    // Focus and move cursor
     setTimeout(() => {
-      inputRefs.current[steps.length]?.focus();
-    }, 50);
-  };
-
-  const removeStep = (index) => {
-    if (steps.length <= 1) return;
-    setSteps(steps.filter((_, i) => i !== index));
-  };
-
-  const handleKeyDown = (e, index) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (index === steps.length - 1) {
-        addStep();
-      } else {
-        inputRefs.current[index + 1]?.focus();
-      }
-    }
-    if (e.key === 'Backspace' && steps[index] === '' && steps.length > 1) {
-      e.preventDefault();
-      removeStep(index);
-      inputRefs.current[Math.max(0, index - 1)]?.focus();
-    }
-  };
-
-  const insertSymbol = (symbol) => {
-    const activeIndex = inputRefs.current.findIndex((r) => r === document.activeElement);
-    const idx = activeIndex >= 0 ? activeIndex : steps.length - 1;
-    const input = inputRefs.current[idx];
-    if (input) {
-      const start = input.selectionStart;
-      const end = input.selectionEnd;
-      const newValue = steps[idx].substring(0, start) + symbol + steps[idx].substring(end);
-      updateStep(idx, newValue);
-      setTimeout(() => {
-        input.selectionStart = input.selectionEnd = start + symbol.length;
-        input.focus();
-      }, 10);
-    }
+      el.focus();
+      el.setSelectionRange(start + symbol.length, start + symbol.length);
+    }, 0);
   };
 
   const handleValidate = async () => {
-    const filledSteps = steps.filter((s) => s.trim() !== '');
-    if (filledSteps.length === 0) return;
+    const steps = text.split('\n').map(s => s.trim()).filter(s => s !== '');
+    if (steps.length === 0) return;
 
     setValidating(true);
     setResults(null);
@@ -104,7 +82,7 @@ export default function SolvePage() {
     setTimerActive(false);
 
     try {
-      const data = await validateSteps({ question_id: parseInt(id), steps: filledSteps });
+      const data = await validateSteps({ question_id: parseInt(id), steps });
 
       // Animate results sequentially
       for (let i = 0; i < data.steps.length; i++) {
@@ -124,9 +102,10 @@ export default function SolvePage() {
   const handleGetHint = async () => {
     setHintLoading(true);
     try {
+      const parsedSteps = text.split('\n').map(s => s.trim()).filter(s => s !== '');
       const data = await apiGetHint({
         question_id: parseInt(id),
-        step_number: steps.filter((s) => s.trim()).length,
+        step_number: parsedSteps.length,
       });
       setHint(data.hint);
     } catch (err) {
@@ -137,7 +116,7 @@ export default function SolvePage() {
   };
 
   const handleReset = () => {
-    setSteps(['']);
+    setText('');
     setResults(null);
     setVerdict(null);
     setCorrectAnswer(null);
@@ -152,19 +131,8 @@ export default function SolvePage() {
     return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
-  const getStepStatus = (index) => {
-    if (!results) return '';
-    const res = results.find((r) => r.step === index + 1);
-    if (!res) return '';
-    return res.valid ? 'success' : 'error';
-  };
-
-  const getStepIcon = (index) => {
-    if (!results) return '';
-    const res = results.find((r) => r.step === index + 1);
-    if (!res) return '';
-    return res.valid ? '✅' : '❌';
-  };
+  // Derived state for lines
+  const lines = text.split('\n');
 
   if (loading) {
     return (
@@ -200,7 +168,7 @@ export default function SolvePage() {
           <div>
             <h1>{question.title}</h1>
             <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.15rem', color: 'var(--accent-primary-hover)', marginTop: '8px' }}>
-              ∫ {question.problem_expr} dx
+              {question.problem_type === 'integral' ? `∫ ${question.problem_expr} dx` : question.problem_expr}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -208,53 +176,58 @@ export default function SolvePage() {
             <div className={`timer ${timer > 300 ? 'danger' : timer > 180 ? 'warning' : ''}`}>
               ⏱ {formatTime(timer)}
             </div>
+            <button className="btn btn-outline btn-sm red" onClick={() => alert("Issue reported to teacher. Thanks for the feedback!")}>
+              🚩 Report Issue
+            </button>
           </div>
         </div>
 
         <div className="solver-layout">
           {/* Editor Panel */}
           <div className="editor-panel">
-            <div className="editor-header">
-              <h3>📝 Solution Editor</h3>
+            <MathKeyboard onInsert={handleInsertSymbol} />
+            
+            <div className="editor-header" style={{ marginTop: '16px' }}>
+              <h3>📝 Code Editor (Step-by-Step)</h3>
               <button className="btn btn-sm btn-outline" onClick={handleReset}>
                 ↺ Reset
               </button>
             </div>
-            <div className="step-editor">
-              <div className="editor-toolbar">
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginRight: '8px' }}>Insert:</span>
-                {['∫', 'x²', 'x³', 'π', '√', 'sin', 'cos', 'ln', 'eˣ', '+ C'].map((sym) => (
-                  <button key={sym} className="toolbar-btn" onClick={() => insertSymbol(sym === 'x²' ? 'x^2' : sym === 'x³' ? 'x^3' : sym === '√' ? 'sqrt(' : sym === 'eˣ' ? 'exp(x)' : sym)}>
-                    {sym}
-                  </button>
-                ))}
-              </div>
-              <div className="step-lines">
-                {steps.map((step, i) => (
-                  <div key={i} className={`step-line ${getStepStatus(i)}`}>
-                    <div className="line-number">{i + 1}</div>
-                    <div className="line-status">{getStepIcon(i)}</div>
-                    <input
-                      ref={(el) => (inputRefs.current[i] = el)}
-                      className="step-input"
-                      value={step}
-                      onChange={(e) => updateStep(i, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, i)}
-                      placeholder={i === 0 ? 'Enter first step...' : 'Next step...'}
-                      disabled={validating}
-                    />
-                    <div className="line-remove" onClick={() => removeStep(i)}>
-                      ×
-                    </div>
+            
+            <div className="code-editor-container">
+              <div className="line-numbers" ref={lineNumbersRef}>
+                {lines.map((_, i) => (
+                  <div key={i} className="line-number-cell">
+                    {i + 1}
                   </div>
                 ))}
               </div>
-              <button className="add-step-btn" onClick={addStep} disabled={validating}>
-                + Add Step
-              </button>
+              <textarea
+                ref={textareaRef}
+                className="code-textarea"
+                value={text}
+                onChange={handleTextChange}
+                onScroll={handleScroll}
+                onCopy={e => { 
+                  if (question && !question.allow_copy_paste) {
+                    e.preventDefault(); 
+                    alert("Copying is disabled for this question!"); 
+                  }
+                }}
+                onPaste={e => { 
+                  if (question && !question.allow_copy_paste) {
+                    e.preventDefault(); 
+                    alert("Pasting is disabled for this question!"); 
+                  }
+                }}
+                spellCheck={false}
+                disabled={validating}
+                placeholder="Press ENTER to separate steps..."
+              />
             </div>
-            <div className="action-bar">
-              <button className={`btn-run ${validating ? 'running' : ''}`} onClick={handleValidate} disabled={validating || steps.every((s) => !s.trim())}>
+            
+            <div className="action-bar" style={{ marginTop: '16px' }}>
+              <button className={`btn-run ${validating ? 'running' : ''}`} onClick={handleValidate} disabled={validating || text.trim() === ''}>
                 {validating ? <><div className="spinner"></div> Validating...</> : '▶ Run / Validate'}
               </button>
               <button className="btn btn-sm btn-outline" onClick={handleGetHint} disabled={hintLoading}>
@@ -282,7 +255,7 @@ export default function SolvePage() {
                 {!results ? (
                   <div className="console-empty">
                     <div className="icon">⚡</div>
-                    <p>Click "Run / Validate" to check your solution</p>
+                    <p>Click "Run / Validate" to check your solution line-by-line</p>
                   </div>
                 ) : (
                   <>
@@ -290,7 +263,7 @@ export default function SolvePage() {
                       <div key={i} className={`step-result ${r.valid ? 'valid' : 'invalid'}`} style={{ animationDelay: `${i * 0.1}s` }}>
                         <span className="result-icon">{r.valid ? '✅' : '❌'}</span>
                         <div>
-                          <span className="step-label">Step {r.step}:</span>{' '}
+                          <span className="step-label">Line {r.step}:</span>{' '}
                           <span className="step-expr">{r.expression}</span>
                           {r.error && <div className="step-error">↳ {r.error}</div>}
                         </div>

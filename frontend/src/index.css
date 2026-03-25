@@ -1,49 +1,53 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
   /* Core palette */
-  --bg-primary: #0a0e1a;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1a2235;
-  --bg-card: rgba(26, 34, 53, 0.7);
-  --bg-glass: rgba(17, 24, 39, 0.6);
+  --bg-primary: #07090e;
+  --bg-secondary: rgba(13, 17, 28, 0.6);
+  --bg-tertiary: rgba(20, 26, 41, 0.8);
+  --bg-card: rgba(20, 25, 36, 0.6);
+  --bg-glass: rgba(10, 14, 23, 0.7);
 
   /* Accents */
-  --accent-primary: #6366f1;
-  --accent-primary-hover: #818cf8;
-  --accent-secondary: #8b5cf6;
+  --accent-primary: #7c3aed;
+  --accent-primary-hover: #a78bfa;
+  --accent-secondary: #3b82f6;
   --accent-success: #10b981;
-  --accent-error: #ef4444;
+  --accent-error: #f43f5e;
   --accent-warning: #f59e0b;
-  --accent-info: #3b82f6;
+  --accent-info: #0ea5e9;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #6366f1, #8b5cf6);
-  --gradient-success: linear-gradient(135deg, #10b981, #34d399);
-  --gradient-error: linear-gradient(135deg, #ef4444, #f87171);
-  --gradient-hero: linear-gradient(135deg, #0a0e1a 0%, #1e1b4b 50%, #0a0e1a 100%);
-  --gradient-card: linear-gradient(145deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.04));
+  --gradient-primary: linear-gradient(135deg, #7c3aed, #3b82f6);
+  --gradient-success: linear-gradient(135deg, #10b981, #059669);
+  --gradient-error: linear-gradient(135deg, #f43f5e, #e11d48);
+  --gradient-hero: radial-gradient(circle at top right, rgba(124, 58, 237, 0.15), transparent 40%),
+                   radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.15), transparent 40%),
+                   var(--bg-primary);
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
 
   /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
   --text-muted: #64748b;
 
   /* Borders */
-  --border-color: rgba(99, 102, 241, 0.15);
-  --border-subtle: rgba(148, 163, 184, 0.1);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-highlight: rgba(124, 58, 237, 0.3);
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.15);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 32px rgba(124, 58, 237, 0.25);
+  --shadow-glow-intense: 0 0 40px rgba(124, 58, 237, 0.4);
 
   /* Sizing */
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 }
 
 *, *::before, *::after {
@@ -57,8 +61,9 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg-primary);
+  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--gradient-hero);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
@@ -169,11 +174,13 @@ input::placeholder, textarea::placeholder {
   align-items: center;
   padding: 16px 32px;
   background: var(--bg-glass);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
   border-bottom: 1px solid var(--border-subtle);
   position: sticky;
   top: 0;
   z-index: 100;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
 .navbar-brand {
   display: flex;
@@ -257,16 +264,27 @@ input::placeholder, textarea::placeholder {
 
 /* -- Cards -- */
 .card {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  backdrop-filter: blur(12px);
-  transition: all 0.3s ease;
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
 }
 .card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
+  border-color: var(--border-highlight);
   box-shadow: var(--shadow-glow);
+  transform: translateY(-4px);
 }
 .card-header {
   display: flex;
@@ -383,9 +401,16 @@ input::placeholder, textarea::placeholder {
   padding: 40px;
   width: 100%;
   max-width: 440px;
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
   box-shadow: var(--shadow-lg);
-  animation: slideUp 0.5s ease-out;
+  animation: slideUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
 }
 .auth-card h1 {
   text-align: center;
@@ -495,12 +520,15 @@ input::placeholder, textarea::placeholder {
 .step-editor {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 400px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-md);
 }
 .editor-toolbar {
   display: flex;

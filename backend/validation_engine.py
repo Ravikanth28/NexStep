@@ -4,9 +4,9 @@ Parses student expressions, validates each step, and compares final answers.
 """
 import re
 from sympy import (
-    symbols, integrate, simplify, diff,
+    symbols, integrate, simplify, diff, Eq, solve, Matrix,
     sin, cos, tan, sec, csc, cot, exp, log, ln, sqrt, pi, E,
-    trigsimp, expand
+    trigsimp, expand, laplace_transform, inverse_laplace_transform, fourier_transform
 )
 from sympy.parsing.sympy_parser import (
     parse_expr, standard_transformations,
@@ -26,6 +26,9 @@ LOCAL_DICT = {
     'sin': sin, 'cos': cos, 'tan': tan,
     'sec': sec, 'csc': csc, 'cot': cot,
     'exp': exp, 'log': log, 'ln': ln, 'sqrt': sqrt,
+    'Matrix': Matrix, 'laplace_transform': laplace_transform,
+    'inverse_laplace_transform': inverse_laplace_transform,
+    'fourier_transform': fourier_transform
 }
 
 
@@ -105,7 +108,7 @@ def format_expression(expr) -> str:
     return s
 
 
-def validate_steps(steps: list[str], problem_expr_str: str) -> dict:
+def validate_integral_steps(steps: list[str], problem_expr_str: str) -> dict:
     """
     Validate a list of student steps for an integral problem.
     
@@ -284,6 +287,93 @@ def validate_steps(steps: list[str], problem_expr_str: str) -> dict:
         "verdict": "Correct" if all_valid else "Incorrect",
         "correct_answer": format_expression(correct_integral) + " + C"
     }
+
+def validate_matrix_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Validate matrix evaluation (e.g. determinants, row reductions, basic eval)."""
+    # Just check if the final step simplifies to the evaluation of the problem expr
+    problem = parse_expression(problem_expr_str)
+    if problem is None:
+        return {"steps": [], "verdict": "Error", "error": "Invalid matrix problem", "correct_answer": None}
+    
+    try:
+        correct_ans = simplify(problem)
+    except Exception as e:
+        return {"steps": [], "verdict": "Error", "error": f"Matrix eval failed: {str(e)}", "correct_answer": None}
+    
+    results = []
+    all_valid = True
+    for i, step_text in enumerate(steps):
+        parsed = parse_expression(step_text)
+        if parsed is None:
+            results.append({"step": i+1, "expression": step_text, "valid": False, "error": "Parse error"})
+            all_valid = False
+            continue
+        
+        # Check if equivalent to correct answer or problem expression
+        try:
+            if simplify(parsed - correct_ans) == 0 or simplify(parsed - problem) == 0:
+                results.append({"step": i+1, "expression": step_text, "valid": True, "error": None})
+            else:
+                results.append({"step": i+1, "expression": step_text, "valid": False, "error": "Incorrect matrix transformation"})
+                all_valid = False
+        except Exception:
+            results.append({"step": i+1, "expression": step_text, "valid": False, "error": "Matrix equivalence check failed"})
+            all_valid = False
+
+    return {
+        "steps": results,
+        "verdict": "Correct" if all_valid and len(results) > 0 else "Incorrect",
+        "correct_answer": format_expression(correct_ans)
+    }
+
+def validate_transform_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Validate transform evaluations (Laplace, Fourier)."""
+    problem = parse_expression(problem_expr_str)
+    if problem is None:
+        return {"steps": [], "verdict": "Error", "error": f"Invalid transform problem: {problem_expr_str}", "correct_answer": None}
+    
+    try:
+        # We need to evaluate the transform specifically if it's a call
+        correct_ans = simplify(problem)
+    except Exception as e:
+        return {"steps": [], "verdict": "Error", "error": f"Transform evaluation failed: {str(e)}", "correct_answer": None}
+    
+    results = []
+    all_valid = True
+    stopped = False
+    for i, step_text in enumerate(steps):
+        if stopped:
+            results.append({"step": i+1, "expression": step_text, "valid": False, "error": "Skipped"})
+            continue
+            
+        parsed = parse_expression(step_text)
+        if parsed is None:
+            results.append({"step": i+1, "expression": step_text, "valid": False, "error": "Parse error"})
+            all_valid = False
+            stopped = True
+            continue
+            
+        if expressions_equal(parsed, correct_ans) or expressions_equal(parsed, problem):
+             results.append({"step": i+1, "expression": step_text, "valid": True, "error": None})
+        else:
+             results.append({"step": i+1, "expression": step_text, "valid": False, "error": "Incorrect transformation"})
+             all_valid = False
+             stopped = True
+
+    return {
+        "steps": results,
+        "verdict": "Correct" if all_valid and len(results) > 0 else "Incorrect",
+        "correct_answer": format_expression(correct_ans)
+    }
+
+def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
+    """Dispatcher for validation based on syllabus topic/problem type."""
+    if problem_type == "matrix":
+        return validate_matrix_steps(steps, problem_expr_str)
+    if problem_type in ["transform", "vector", "stats"]:
+        return validate_transform_steps(steps, problem_expr_str)
+        
+    return validate_integral_steps(steps, problem_expr_str)
 
 
 def get_hint(problem_expr_str: str, step_number: int = 0) -> str:

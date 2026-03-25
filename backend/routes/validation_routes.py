@@ -43,7 +43,7 @@ def validate_solution(
         raise HTTPException(status_code=400, detail="No steps provided")
 
     # Validate steps using SymPy engine
-    result = validate_steps(req.steps, question.problem_expr)
+    result = validate_steps(req.steps, question.problem_expr, question.problem_type)
 
     # Save submission
     is_correct = result["verdict"] == "Correct"

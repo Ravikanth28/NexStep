@@ -13,7 +13,10 @@ class QuestionCreate(BaseModel):
     title: str
     problem_expr: str
     difficulty: str = "medium"
+    topic: str = "Calculus"
+    problem_type: str = "integral"
     hints: list[str] = []
+    allow_copy_paste: bool = True
 
 
 def _resolve_user(user_data: dict = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -25,10 +28,13 @@ def _resolve_user(user_data: dict = Depends(get_current_user), db: Session = Dep
 
 
 @router.get("")
-def list_questions(difficulty: str = None, db: Session = Depends(get_db)):
+def list_questions(difficulty: str = None, topic: str = None, db: Session = Depends(get_db)):
     query = db.query(Question)
     if difficulty:
         query = query.filter(Question.difficulty == difficulty)
+    if topic and topic != "All":
+        query = query.filter(Question.topic == topic)
+        
     questions = query.order_by(Question.created_at.desc()).all()
     return [
         {
@@ -36,7 +42,10 @@ def list_questions(difficulty: str = None, db: Session = Depends(get_db)):
             "title": q.title,
             "problem_expr": q.problem_expr,
             "difficulty": q.difficulty,
+            "topic": q.topic,
+            "problem_type": q.problem_type,
             "hints": json.loads(q.hints) if q.hints else [],
+            "allow_copy_paste": q.allow_copy_paste,
             "created_by": q.creator.username if q.creator else None,
             "created_at": str(q.created_at)
         }
@@ -54,7 +63,10 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
         "title": q.title,
         "problem_expr": q.problem_expr,
         "difficulty": q.difficulty,
+        "topic": q.topic,
+        "problem_type": q.problem_type,
         "hints": json.loads(q.hints) if q.hints else [],
+        "allow_copy_paste": q.allow_copy_paste,
         "created_by": q.creator.username if q.creator else None,
         "created_at": str(q.created_at)
     }
@@ -73,7 +85,10 @@ def create_question(
         title=req.title,
         problem_expr=req.problem_expr,
         difficulty=req.difficulty,
+        topic=req.topic,
+        problem_type=req.problem_type,
         hints=json.dumps(req.hints),
+        allow_copy_paste=req.allow_copy_paste,
         created_by=current_user.id
     )
     db.add(question)
@@ -87,7 +102,10 @@ def create_question(
             "title": question.title,
             "problem_expr": question.problem_expr,
             "difficulty": question.difficulty,
-            "hints": req.hints
+            "topic": question.topic,
+            "problem_type": question.problem_type,
+            "hints": req.hints,
+            "allow_copy_paste": question.allow_copy_paste
         }
     }
 
