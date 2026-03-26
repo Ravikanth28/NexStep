@@ -1466,7 +1466,27 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        if any(token in line for token in ["linear differential equation", "homogeneous", "non-homogeneous", "auxiliary equation"]):
+        # Check for final solution first (highest priority)
+        if any(token in line for token in ["y =", "general solution", "complete solution", "final:"]):
+            progress["solution"] = True
+            valid = True
+            message = "Final differential-equation solution form recognized."
+        # Check for differential notation (dy/dx, dy, dx)
+        elif any(token in line for token in ["dy/dx", "dy=", "dy =", "dx", "differential"]):
+            valid = True
+            message = "Differential notation recognized."
+        # Check for integral notation (∫ or integral keyword or integral evaluation like "∫ x dx = x²/2")
+        elif any(token in line for token in ["integrate", "∫", "integral"]):
+            valid = True
+            message = "Integral step in ODE solution recognized."
+        # Check for simple arithmetic/algebra (numbers and operators without differential notation)
+        elif any(c in line for c in "0123456789") and any(op in line for op in ["=", "+", "-", "*", "/"]):
+            # Make sure it's not a differential step
+            if "dy" not in line and "dx" not in line:
+                valid = True
+                message = "Algebraic/arithmetic step recognized."
+        # Check for ODE-specific keywords
+        elif any(token in line for token in ["linear differential equation", "homogeneous", "non-homogeneous", "auxiliary equation"]):
             progress["classification"] = True
             valid = True
             message = "Good problem classification/setup."
@@ -1482,10 +1502,6 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
             progress["pi"] = True
             valid = True
             message = "Particular integral/solution step recognized."
-        elif any(token in line for token in ["y =", "general solution", "complete solution"]):
-            progress["solution"] = True
-            valid = True
-            message = "Final differential-equation solution form recognized."
 
         if not valid:
             all_valid = False
@@ -1507,16 +1523,9 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
                 }
             )
 
+    # Only enforce final solution requirement if we didn't see it
     if results and not progress["solution"]:
         all_valid = False
-        results.append(
-            {
-                "step": len(results) + 1,
-                "expression": "Final solution",
-                "valid": False,
-                "error": "Finish by writing the complete solution y = CF + PI (or equivalent final form).",
-            }
-        )
 
     return {
         "steps": results,
