@@ -13,6 +13,7 @@ export default function SolvePage() {
   const [correctAnswer, setCorrectAnswer] = useState(null);
   const [validationError, setValidationError] = useState('');
   const [questionAnalysis, setQuestionAnalysis] = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [hint, setHint] = useState('');
@@ -83,6 +84,7 @@ export default function SolvePage() {
     setCorrectAnswer(null);
     setValidationError('');
     setQuestionAnalysis(null);
+    setFeedback(null);
     setTimerActive(false);
 
     try {
@@ -93,6 +95,7 @@ export default function SolvePage() {
       setVerdict(data.verdict || null);
       setCorrectAnswer(data.correct_answer || null);
       setQuestionAnalysis(data.question_analysis || null);
+      setFeedback(data.feedback || null);
 
       if (data.error) {
         setValidationError(data.error);
@@ -140,6 +143,7 @@ export default function SolvePage() {
     setCorrectAnswer(null);
     setValidationError('');
     setQuestionAnalysis(null);
+    setFeedback(null);
     setHint('');
     setTimer(0);
     setTimerActive(false);
@@ -299,6 +303,34 @@ export default function SolvePage() {
                     {questionAnalysis.notes.map((note) => (
                       <div key={note} className="analysis-note">{note}</div>
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {feedback && (
+              <div className="feedback-panel">
+                <div className="panel-label">Learning Feedback</div>
+                <p className="feedback-summary">{feedback.summary}</p>
+                {feedback.strengths?.length > 0 && (
+                  <div className="feedback-group">
+                    <h4>What you did well</h4>
+                    {feedback.strengths.map((item) => (
+                      <div key={item} className="feedback-chip good">{item}</div>
+                    ))}
+                  </div>
+                )}
+                {feedback.mistakes?.length > 0 && (
+                  <div className="feedback-group">
+                    <h4>What to fix</h4>
+                    {feedback.mistakes.map((item) => (
+                      <div key={item} className="feedback-chip warn">{item}</div>
+                    ))}
+                  </div>
+                )}
+                {feedback.next_step && (
+                  <div className="feedback-next">
+                    <strong>Next suggestion:</strong> {feedback.next_step}
                   </div>
                 )}
               </div>

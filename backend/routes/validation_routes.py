@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from database import get_db
 from models import Question, Submission, StepLog, User
 from auth import get_current_user
-from validation_engine import validate_steps, get_hint
+from validation_engine import build_learning_feedback, validate_steps, get_hint
 from syllabus_engine import build_validation_notes, analyze_question_text, deserialize_concept_tags
 
 router = APIRouter(prefix="/api", tags=["validation"])
@@ -86,6 +86,11 @@ def validate_solution(
         "score": score,
         "correct_answer": result.get("correct_answer"),
         "error": result.get("error"),
+        "feedback": build_learning_feedback(
+            result,
+            question.topic or analysis.topic,
+            question.validation_strategy or analysis.strategy,
+        ),
         "question_analysis": {
             "subject": question.subject or analysis.subject,
             "topic": question.topic or analysis.topic,
