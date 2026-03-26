@@ -34,8 +34,10 @@ from sympy.parsing.sympy_parser import (
     standard_transformations,
 )
 
-x = symbols("x")
+x, s, t = symbols("x s t")
+n = symbols("n")
 C = symbols("C")
+
 
 TRANSFORMATIONS = standard_transformations + (
     implicit_multiplication_application,
@@ -44,6 +46,9 @@ TRANSFORMATIONS = standard_transformations + (
 
 LOCAL_DICT = {
     "x": x,
+    "s": s,
+    "t": t,
+    "n": n,
     "C": C,
     "e": E,
     "pi": pi,
@@ -64,18 +69,23 @@ LOCAL_DICT = {
 }
 
 
+
+
 def preprocess_text(text: str) -> str:
     """Clean up student input for parsing."""
     text = text.strip()
     text = re.sub(r"^(step\s*\d+\s*[:\.]?\s*)", "", text, flags=re.IGNORECASE)
-    text = text.replace("âˆ«", "∫")
-    text = text.replace("Ã—", "*").replace("×", "*")
-    text = text.replace("Ã·", "/").replace("÷", "/")
-    text = text.replace("−", "-").replace("–", "-").replace("âˆ’", "-")
+    text = text.replace("\u222b", "∫")
+    text = text.replace("\u00d7", "*").replace("×", "*")
+    text = text.replace("\u00f7", "/").replace("÷", "/")
+    text = text.replace("−", "-").replace("–", "-").replace("\u2212", "-")
     text = re.sub(r"[∫]\s*", "", text)
     text = re.sub(r"\s+dx\s*$", "", text)
     text = re.sub(r"^=\s*", "", text)
     text = text.replace("^", "**")
+    # Convert L[expr] shorthand to laplace_transform(expr, x, s)[0]
+    text = re.sub(r"L\[([^\]]+)\]", r"laplace_transform(\1, x, s)[0]", text)
+
     return text.strip()
 
 
