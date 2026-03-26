@@ -5,6 +5,12 @@ from pydantic import BaseModel
 from database import get_db
 from models import Question, User
 from auth import get_current_user
+from syllabus_engine import (
+    SUBJECTS,
+    analyze_question_text,
+    deserialize_concept_tags,
+    serialize_concept_tags,
+)
 
 router = APIRouter(prefix="/api/questions", tags=["questions"])
 
@@ -12,11 +18,34 @@ router = APIRouter(prefix="/api/questions", tags=["questions"])
 class QuestionCreate(BaseModel):
     title: str
     problem_expr: str
-    difficulty: str = "medium"
-    topic: str = "Calculus"
-    problem_type: str = "integral"
+    difficulty: str | None = None
+    topic: str | None = None
+    problem_type: str | None = None
+    subject: str | None = None
+    unit_name: str | None = None
+    concept_tags: list[str] = []
     hints: list[str] = []
     allow_copy_paste: bool = True
+
+
+def _serialize_question(q: Question):
+    return {
+        "id": q.id,
+        "title": q.title,
+        "problem_expr": q.problem_expr,
+        "difficulty": q.difficulty,
+        "subject": q.subject,
+        "topic": q.topic,
+        "unit_name": q.unit_name,
+        "concept_tags": deserialize_concept_tags(q.concept_tags),
+        "problem_type": q.problem_type,
+        "validation_strategy": q.validation_strategy,
+        "analysis_confidence": q.analysis_confidence,
+        "hints": json.loads(q.hints) if q.hints else [],
+        "allow_copy_paste": q.allow_copy_paste,
+        "created_by": q.creator.username if q.creator else None,
+        "created_at": str(q.created_at),
+    }
 
 
 def _resolve_user(user_data: dict = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -36,21 +65,27 @@ def list_questions(difficulty: str = None, topic: str = None, db: Session = Depe
         query = query.filter(Question.topic == topic)
         
     questions = query.order_by(Question.created_at.desc()).all()
-    return [
-        {
-            "id": q.id,
-            "title": q.title,
-            "problem_expr": q.problem_expr,
-            "difficulty": q.difficulty,
-            "topic": q.topic,
-            "problem_type": q.problem_type,
-            "hints": json.loads(q.hints) if q.hints else [],
-            "allow_copy_paste": q.allow_copy_paste,
-            "created_by": q.creator.username if q.creator else None,
-            "created_at": str(q.created_at)
-        }
-        for q in questions
-    ]
+    return [_serialize_question(q) for q in questions]
+
+
+@router.get("/meta/syllabus")
+def get_syllabus_meta():
+    return {"subjects": SUBJECTS}
+
+
+@router.post("/analyze")
+def analyze_question_payload(req: QuestionCreate):
+    analysis = analyze_question_text(req.title, req.problem_expr, req.topic)
+    return {
+        "analysis": analysis.to_dict(),
+        "teacher_overrides": {
+            "subject": req.subject,
+            "topic": req.topic,
+            "unit_name": req.unit_name,
+            "problem_type": req.problem_type,
+            "concept_tags": req.concept_tags,
+        },
+    }
 
 
 @router.get("/{question_id}")
@@ -58,18 +93,7 @@ def get_question(question_id: int, db: Session = Depends(get_db)):
     q = db.query(Question).filter(Question.id == question_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="Question not found")
-    return {
-        "id": q.id,
-        "title": q.title,
-        "problem_expr": q.problem_expr,
-        "difficulty": q.difficulty,
-        "topic": q.topic,
-        "problem_type": q.problem_type,
-        "hints": json.loads(q.hints) if q.hints else [],
-        "allow_copy_paste": q.allow_copy_paste,
-        "created_by": q.creator.username if q.creator else None,
-        "created_at": str(q.created_at)
-    }
+    return _serialize_question(q)
 
 
 @router.post("")
@@ -81,12 +105,20 @@ def create_question(
     if current_user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create questions")
 
+    analysis = analyze_question_text(req.title, req.problem_expr, req.topic)
+    concept_tags = req.concept_tags or analysis.concept_tags
+
     question = Question(
         title=req.title,
         problem_expr=req.problem_expr,
-        difficulty=req.difficulty,
-        topic=req.topic,
-        problem_type=req.problem_type,
+        difficulty=req.difficulty or analysis.difficulty,
+        subject=req.subject or analysis.subject,
+        topic=req.topic or analysis.topic,
+        unit_name=req.unit_name or analysis.unit_name,
+        concept_tags=serialize_concept_tags(concept_tags),
+        problem_type=req.problem_type or analysis.strategy,
+        validation_strategy=req.problem_type or analysis.strategy,
+        analysis_confidence=analysis.confidence,
         hints=json.dumps(req.hints),
         allow_copy_paste=req.allow_copy_paste,
         created_by=current_user.id
@@ -97,16 +129,7 @@ def create_question(
 
     return {
         "message": "Question created successfully",
-        "question": {
-            "id": question.id,
-            "title": question.title,
-            "problem_expr": question.problem_expr,
-            "difficulty": question.difficulty,
-            "topic": question.topic,
-            "problem_type": question.problem_type,
-            "hints": req.hints,
-            "allow_copy_paste": question.allow_copy_paste
-        }
+        "question": _serialize_question(question)
     }
 
 

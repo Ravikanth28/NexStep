@@ -1,24 +1,23 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
 import QuestionsPage from './pages/QuestionsPage';
+import SignupPage from './pages/SignupPage';
 import SolvePage from './pages/SolvePage';
-import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import SubmissionReportPage from './pages/SubmissionReportPage';
+import TeacherDashboard from './pages/TeacherDashboard';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   return (
     <nav className="navbar">
       <Link to="/" className="navbar-brand" style={{ textDecoration: 'none' }}>
-        <span style={{ fontSize: '1.4rem' }}>∫</span>
-        <span>CalcRunner</span>
+        <span className="brand-mark">Nx</span>
+        <span>NexStep Maths Explorer</span>
       </Link>
       <div className="navbar-links">
         {user ? (
@@ -26,19 +25,19 @@ function Navbar({ user, onLogout }) {
             {user.role === 'student' && (
               <>
                 <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>
-                  📚 Problems
+                  Practice
                 </Link>
                 <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>
-                  📊 Progress
+                  Progress
                 </Link>
               </>
             )}
             {user.role === 'teacher' && (
               <Link to="/teacher" className={`nav-link ${isActive('/teacher') ? 'active' : ''}`}>
-                🎓 Dashboard
+                Workspace
               </Link>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '8px', paddingLeft: '16px', borderLeft: '1px solid var(--border-subtle)' }}>
+            <div className="nav-user">
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 {user.username}
                 <span className={`badge ${user.role === 'teacher' ? 'badge-medium' : 'badge-easy'}`} style={{ marginLeft: '8px' }}>
@@ -53,7 +52,7 @@ function Navbar({ user, onLogout }) {
         ) : (
           <>
             <Link to="/login" className="nav-btn outline">Sign In</Link>
-            <Link to="/signup" className="nav-btn primary">Get Started</Link>
+            <Link to="/signup" className="nav-btn primary">Launch Platform</Link>
           </>
         )}
       </div>
@@ -71,46 +70,66 @@ function HomePage({ user }) {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 70px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gradient-hero)', padding: '24px', textAlign: 'center' }}>
-      <div className="slide-up">
-        <div style={{ fontSize: '4rem', marginBottom: '16px' }}>∫</div>
-        <h1 style={{ fontSize: '3rem', fontWeight: 800, marginBottom: '16px', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          CalcRunner
-        </h1>
-        <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto 40px' }}>
-          A code-runner for mathematics. Write step-by-step integral solutions and get instant validation with detailed feedback.
-        </p>
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          {user ? (
-            <button className="btn btn-primary btn-lg" onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/questions')}>
-              Go to {user.role === 'teacher' ? 'Dashboard' : 'Problems'} →
-            </button>
-          ) : (
-            <>
-              <button className="btn btn-primary btn-lg" onClick={() => navigate('/signup')}>
-                Get Started →
+    <div className="landing-page">
+      <section className="landing-hero">
+        <div className="landing-copy slide-up">
+          <div className="hero-kicker">Dynamic Engineering Mathematics Platform</div>
+          <h1>From syllabus to solution validation, all in one guided workspace.</h1>
+          <p>
+            Teachers can post fresh questions from matrices, transforms, probability, or vector calculus.
+            Students can solve them line by line in a symbol-aware editor and get structured validation feedback.
+          </p>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            {user ? (
+              <button className="btn btn-primary btn-lg" onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/questions')}>
+                Open {user.role === 'teacher' ? 'Teacher Workspace' : 'Practice Hub'}
               </button>
-              <button className="btn btn-outline btn-lg" onClick={() => navigate('/login')}>
-                Sign In
-              </button>
-            </>
-          )}
+            ) : (
+              <>
+                <button className="btn btn-primary btn-lg" onClick={() => navigate('/signup')}>
+                  Create Account
+                </button>
+                <button className="btn btn-outline btn-lg" onClick={() => navigate('/login')}>
+                  Sign In
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px', maxWidth: '800px', margin: '60px auto 0' }}>
-          {[
-            { icon: '📝', title: 'Step-by-Step', desc: 'Write solutions like code, line by line' },
-            { icon: '⚡', title: 'Instant Validation', desc: 'Each step is verified mathematically' },
-            { icon: '📊', title: 'Progress Tracking', desc: 'Track your improvement over time' },
-          ].map((f, i) => (
-            <div key={i} className="card" style={{ textAlign: 'center', padding: '32px 24px' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>{f.icon}</div>
-              <h3 style={{ marginBottom: '8px', fontSize: '1.05rem' }}>{f.title}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{f.desc}</p>
+        <div className="hero-stage">
+          <div className="hero-orbit orbit-one"></div>
+          <div className="hero-orbit orbit-two"></div>
+          <div className="hero-panel card">
+            <div className="hero-panel-label">Live Workflow</div>
+            <div className="hero-flow-step">
+              <strong>1. Teacher enters question</strong>
+              <p>Raw engineering math problem text or symbolic expression.</p>
             </div>
-          ))}
+            <div className="hero-flow-step">
+              <strong>2. System maps the syllabus</strong>
+              <p>Topic, unit, strategy, and difficulty are inferred dynamically.</p>
+            </div>
+            <div className="hero-flow-step">
+              <strong>3. Student writes full steps</strong>
+              <p>Every line is checked with topic-aware feedback and reference answers.</p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className="landing-strip">
+        {[
+          ['Dynamic Mapping', 'Questions do not need to be pre-stored one by one.'],
+          ['Step Validation', 'Students write complete working, not only final answers.'],
+          ['Teacher Visibility', 'Dashboards and exports show accuracy and performance trends.'],
+        ].map(([title, description]) => (
+          <div key={title} className="card feature-panel">
+            <h3>{title}</h3>
+            <p>{description}</p>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }

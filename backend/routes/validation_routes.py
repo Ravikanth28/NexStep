@@ -5,7 +5,8 @@ from pydantic import BaseModel
 from database import get_db
 from models import Question, Submission, StepLog, User
 from auth import get_current_user
-from validation_engine import validate_steps, get_hint
+from validation_engine import build_learning_feedback, validate_steps, get_hint
+from syllabus_engine import build_validation_notes, analyze_question_text, deserialize_concept_tags
 
 router = APIRouter(prefix="/api", tags=["validation"])
 
@@ -43,7 +44,12 @@ def validate_solution(
         raise HTTPException(status_code=400, detail="No steps provided")
 
     # Validate steps using SymPy engine
-    result = validate_steps(req.steps, question.problem_expr, question.problem_type)
+    analysis = analyze_question_text(question.title, question.problem_expr, question.topic)
+    result = validate_steps(
+        req.steps,
+        question.problem_expr,
+        question.validation_strategy or question.problem_type or analysis.strategy,
+    )
 
     # Save submission
     is_correct = result["verdict"] == "Correct"
@@ -79,7 +85,22 @@ def validate_solution(
         "verdict": result["verdict"],
         "score": score,
         "correct_answer": result.get("correct_answer"),
-        "error": result.get("error")
+        "error": result.get("error"),
+        "feedback": build_learning_feedback(
+            result,
+            question.topic or analysis.topic,
+            question.validation_strategy or analysis.strategy,
+        ),
+        "question_analysis": {
+            "subject": question.subject or analysis.subject,
+            "topic": question.topic or analysis.topic,
+            "unit_name": question.unit_name or analysis.unit_name,
+            "problem_type": question.problem_type or analysis.strategy,
+            "validation_strategy": question.validation_strategy or analysis.strategy,
+            "concept_tags": deserialize_concept_tags(question.concept_tags) or analysis.concept_tags,
+            "analysis_confidence": question.analysis_confidence or analysis.confidence,
+            "notes": build_validation_notes(analysis),
+        },
     }
 
 

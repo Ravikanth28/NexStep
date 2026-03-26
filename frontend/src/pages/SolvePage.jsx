@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getQuestion, validateSteps, getHint as apiGetHint } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getHint as apiGetHint, getQuestion, validateSteps } from '../api';
 import MathKeyboard from '../components/MathKeyboard';
 
 export default function SolvePage() {
@@ -12,6 +12,8 @@ export default function SolvePage() {
   const [verdict, setVerdict] = useState(null);
   const [correctAnswer, setCorrectAnswer] = useState(null);
   const [validationError, setValidationError] = useState('');
+  const [questionAnalysis, setQuestionAnalysis] = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [hint, setHint] = useState('');
@@ -28,7 +30,7 @@ export default function SolvePage() {
   useEffect(() => {
     let interval;
     if (timerActive) {
-      interval = setInterval(() => setTimer((t) => t + 1), 1000);
+      interval = setInterval(() => setTimer((current) => current + 1), 1000);
     }
     return () => clearInterval(interval);
   }, [timerActive]);
@@ -57,23 +59,23 @@ export default function SolvePage() {
   };
 
   const handleInsertSymbol = (symbol) => {
-    const el = textareaRef.current;
-    if (!el) return;
+    const editor = textareaRef.current;
+    if (!editor) return;
 
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const newValue = text.substring(0, start) + symbol + text.substring(end);
-    setText(newValue);
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const nextValue = text.substring(0, start) + symbol + text.substring(end);
+    setText(nextValue);
     if (!timerActive) setTimerActive(true);
 
     setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + symbol.length, start + symbol.length);
+      editor.focus();
+      editor.setSelectionRange(start + symbol.length, start + symbol.length);
     }, 0);
   };
 
   const handleValidate = async () => {
-    const steps = text.split('\n').map((s) => s.trim()).filter((s) => s !== '');
+    const steps = text.split('\n').map((line) => line.trim()).filter(Boolean);
     if (steps.length === 0) return;
 
     setValidating(true);
@@ -81,6 +83,8 @@ export default function SolvePage() {
     setVerdict(null);
     setCorrectAnswer(null);
     setValidationError('');
+    setQuestionAnalysis(null);
+    setFeedback(null);
     setTimerActive(false);
 
     try {
@@ -90,6 +94,8 @@ export default function SolvePage() {
       setResults(stepResults);
       setVerdict(data.verdict || null);
       setCorrectAnswer(data.correct_answer || null);
+      setQuestionAnalysis(data.question_analysis || null);
+      setFeedback(data.feedback || null);
 
       if (data.error) {
         setValidationError(data.error);
@@ -117,7 +123,7 @@ export default function SolvePage() {
   const handleGetHint = async () => {
     setHintLoading(true);
     try {
-      const parsedSteps = text.split('\n').map((s) => s.trim()).filter((s) => s !== '');
+      const parsedSteps = text.split('\n').map((line) => line.trim()).filter(Boolean);
       const data = await apiGetHint({
         question_id: parseInt(id, 10),
         step_number: parsedSteps.length,
@@ -136,6 +142,8 @@ export default function SolvePage() {
     setVerdict(null);
     setCorrectAnswer(null);
     setValidationError('');
+    setQuestionAnalysis(null);
+    setFeedback(null);
     setHint('');
     setTimer(0);
     setTimerActive(false);
@@ -148,10 +156,10 @@ export default function SolvePage() {
   };
 
   const verdictLabel = verdict === 'Correct'
-    ? 'Correct Answer!'
+    ? 'Correct Answer'
     : verdict === 'Error'
       ? 'Validation Error'
-      : 'Incorrect Answer';
+      : verdict || 'Incorrect Answer';
 
   const lines = text.split('\n');
 
@@ -185,19 +193,26 @@ export default function SolvePage() {
   return (
     <div className="page">
       <div className="container">
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="workspace-hero solve-hero">
           <div>
+            <div className="hero-kicker">Guided Solve Mode</div>
             <h1>{question.title}</h1>
-            <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.15rem', color: 'var(--accent-primary-hover)', marginTop: '8px' }}>
-              {question.problem_type === 'integral' ? `∫ ${question.problem_expr} dx` : question.problem_expr}
+            <div className="chip-wrap" style={{ marginTop: '14px' }}>
+              <span className="soft-pill">{question.subject || 'Engineering Mathematics'}</span>
+              <span className="soft-pill">{question.topic}</span>
+              <span className="soft-pill">{question.unit_name || 'General Problem Solving'}</span>
+              <span className="soft-pill">{question.validation_strategy || question.problem_type}</span>
+            </div>
+            <p className="hero-expression">
+              {question.problem_expr}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <span className={`badge badge-${question.difficulty}`}>{question.difficulty}</span>
             <div className={`timer ${timer > 300 ? 'danger' : timer > 180 ? 'warning' : ''}`}>
-              ⏱ {formatTime(timer)}
+              {formatTime(timer)}
             </div>
-            <button className="btn btn-outline btn-sm red" onClick={() => alert('Issue reported to teacher. Thanks for the feedback!')}>
+            <button className="btn btn-outline btn-sm" onClick={() => alert('Issue reported to teacher. Thanks for the feedback!')}>
               Report Issue
             </button>
           </div>
@@ -208,7 +223,7 @@ export default function SolvePage() {
             <MathKeyboard onInsert={handleInsertSymbol} />
 
             <div className="editor-header" style={{ marginTop: '16px' }}>
-              <h3>Code Editor (Step-by-Step)</h3>
+              <h3>Step Editor</h3>
               <button className="btn btn-sm btn-outline" onClick={handleReset}>
                 Reset
               </button>
@@ -216,9 +231,9 @@ export default function SolvePage() {
 
             <div className="code-editor-container">
               <div className="line-numbers" ref={lineNumbersRef}>
-                {lines.map((_, i) => (
-                  <div key={i} className="line-number-cell">
-                    {i + 1}
+                {lines.map((_, index) => (
+                  <div key={index} className="line-number-cell">
+                    {index + 1}
                   </div>
                 ))}
               </div>
@@ -231,18 +246,18 @@ export default function SolvePage() {
                 onCopy={(e) => {
                   if (question && !question.allow_copy_paste) {
                     e.preventDefault();
-                    alert('Copying is disabled for this question!');
+                    alert('Copying is disabled for this question.');
                   }
                 }}
                 onPaste={(e) => {
                   if (question && !question.allow_copy_paste) {
                     e.preventDefault();
-                    alert('Pasting is disabled for this question!');
+                    alert('Pasting is disabled for this question.');
                   }
                 }}
                 spellCheck={false}
                 disabled={validating}
-                placeholder="Press ENTER to separate steps..."
+                placeholder="Write one mathematical step per line."
               />
             </div>
 
@@ -257,8 +272,67 @@ export default function SolvePage() {
 
             {hint && (
               <div className="hint-box">
-                <span className="hint-icon">💡</span>
+                <span className="hint-icon">Hint</span>
                 <span>{hint}</span>
+              </div>
+            )}
+
+            {questionAnalysis && (
+              <div className="analysis-panel">
+                <div className="panel-label">Validation Strategy</div>
+                <div className="analysis-grid">
+                  <div className="analysis-item">
+                    <span className="analysis-label">Detected Topic</span>
+                    <strong>{questionAnalysis.topic}</strong>
+                  </div>
+                  <div className="analysis-item">
+                    <span className="analysis-label">Unit</span>
+                    <strong>{questionAnalysis.unit_name}</strong>
+                  </div>
+                  <div className="analysis-item">
+                    <span className="analysis-label">Strategy</span>
+                    <strong>{questionAnalysis.validation_strategy}</strong>
+                  </div>
+                  <div className="analysis-item">
+                    <span className="analysis-label">Confidence</span>
+                    <strong>{Math.round((questionAnalysis.analysis_confidence || 0) * 100)}%</strong>
+                  </div>
+                </div>
+                {questionAnalysis.notes?.length > 0 && (
+                  <div className="analysis-note-list">
+                    {questionAnalysis.notes.map((note) => (
+                      <div key={note} className="analysis-note">{note}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {feedback && (
+              <div className="feedback-panel">
+                <div className="panel-label">Learning Feedback</div>
+                <p className="feedback-summary">{feedback.summary}</p>
+                {feedback.strengths?.length > 0 && (
+                  <div className="feedback-group">
+                    <h4>What you did well</h4>
+                    {feedback.strengths.map((item) => (
+                      <div key={item} className="feedback-chip good">{item}</div>
+                    ))}
+                  </div>
+                )}
+                {feedback.mistakes?.length > 0 && (
+                  <div className="feedback-group">
+                    <h4>What to fix</h4>
+                    {feedback.mistakes.map((item) => (
+                      <div key={item} className="feedback-chip warn">{item}</div>
+                    ))}
+                  </div>
+                )}
+                {feedback.next_step && (
+                  <div className="feedback-next">
+                    <strong>Next suggestion:</strong> {feedback.next_step}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -274,14 +348,14 @@ export default function SolvePage() {
               <div className="console-body">
                 {!results ? (
                   <div className="console-empty">
-                    <div className="icon">⚡</div>
-                    <p>Click "Run / Validate" to check your solution line-by-line</p>
+                    <div className="icon">Analyze</div>
+                    <p>Run validation to inspect your solution line by line.</p>
                   </div>
                 ) : (
                   <>
                     {validationError && (
                       <div className="step-result invalid">
-                        <span className="result-icon">❌</span>
+                        <span className="result-icon">X</span>
                         <div>
                           <span className="step-label">Validation failed:</span>{' '}
                           <span className="step-expr">{validationError}</span>
@@ -290,11 +364,11 @@ export default function SolvePage() {
                     )}
                     {results.map((result, index) => (
                       <div key={index} className={`step-result ${result.valid ? 'valid' : 'invalid'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-                        <span className="result-icon">{result.valid ? '✅' : '❌'}</span>
+                        <span className="result-icon">{result.valid ? 'OK' : 'X'}</span>
                         <div>
                           <span className="step-label">Line {result.step}:</span>{' '}
                           <span className="step-expr">{result.expression}</span>
-                          {result.error && <div className="step-error">↳ {result.error}</div>}
+                          {result.error && <div className="step-error">{'->'} {result.error}</div>}
                         </div>
                       </div>
                     ))}
@@ -302,7 +376,7 @@ export default function SolvePage() {
                       <div className={`verdict-box ${verdict === 'Correct' ? 'correct' : 'incorrect'}`}>
                         {verdictLabel}
                         {correctAnswer && (
-                          <div className="correct-answer">Correct answer: {correctAnswer}</div>
+                          <div className="correct-answer">Reference answer: {correctAnswer}</div>
                         )}
                       </div>
                     )}

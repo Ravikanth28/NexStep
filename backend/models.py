@@ -25,8 +25,13 @@ class Question(Base):
     title = Column(String(200), nullable=False)
     problem_expr = Column(String(500), nullable=False)  # e.g. "x**2"
     difficulty = Column(String(20), default="medium")  # easy, medium, hard
+    subject = Column(String(120), default="Engineering Mathematics")
     topic = Column(String(100), default="Calculus")  # e.g., Matrices, Integral
+    unit_name = Column(String(150), default="General Problem Solving")
+    concept_tags = Column(Text, default="[]")
     problem_type = Column(String(50), default="integral")  # e.g., integral, matrix, ode
+    validation_strategy = Column(String(50), default="integral")
+    analysis_confidence = Column(Float, default=0.0)
     hints = Column(Text, default="[]")  # JSON array of hints
     allow_copy_paste = Column(Boolean, default=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
