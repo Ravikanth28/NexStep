@@ -13,6 +13,7 @@ from sympy import (
     diff,
     exp,
     expand,
+    factorial,
     fourier_transform,
     integrate,
     inverse_laplace_transform,
@@ -65,10 +66,13 @@ LOCAL_DICT = {
     "log": log,
     "ln": log,
     "sqrt": sqrt,
+    "factorial": factorial,
     "Matrix": Matrix,
     "laplace_transform": laplace_transform,
     "inverse_laplace_transform": inverse_laplace_transform,
     "fourier_transform": fourier_transform,
+    "integrate": integrate,
+    "diff": diff,
 }
 
 
@@ -79,6 +83,10 @@ def infer_problem_type(problem_expr_str: str) -> str:
     if any(keyword in lowered for keyword in ["matrix", "[[", "det(", "determinant", "eigen", "rank"]):
         return "matrix"
     if any(keyword in lowered for keyword in ["laplace", "fourier", "z_transform", "inverse_laplace"]):
+        return "transform"
+    if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str or ""):
+        return "transform"
+    if re.search(r"(?<![A-Za-z])L\s*\^", problem_expr_str or ""):
         return "transform"
     if any(keyword in lowered for keyword in ["probability", "bayes", "chi", "anova", "normal(", "poisson", "binomial", "p("]):
         return "stats"
@@ -95,15 +103,205 @@ def preprocess_text(text: str) -> str:
     """Clean up student input for parsing."""
     text = text.strip()
     text = re.sub(r"^(step\s*\d+\s*[:\.]?\s*)", "", text, flags=re.IGNORECASE)
+    # Remove common step labels and prefixes
+    text = re.sub(r"^(antiderivative|derivative|integral|let|using|from|applying|via|by|therefore|thus|note|observation|remark|simplifying|factoring|expanding|grouping|combining|solving|solving for|find|compute|calculate|show|proof|claim|verify|check)[\s:,]*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^(=\s*|\→\s*|→\s*)", "", text)
     text = text.replace("âˆ«", "∫")
     text = text.replace("Ã—", "*").replace("×", "*")
     text = text.replace("Ã·", "/").replace("÷", "/")
     text = text.replace("−", "-").replace("–", "-").replace("âˆ’", "-")
+    # Convert Unicode subscript/superscript integral limits: ∫₀¹ → ∫(0,1), and x² → x^2
+    _sub_dig = str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")
+    _sup_map = {"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9"}
+    text = re.sub(
+        r"∫([₀₁₂₃₄₅₆₇₈₉]+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+)",
+        lambda m: "∫(" + m.group(1).translate(_sub_dig) + "," + "".join(_sup_map.get(c, c) for c in m.group(2)) + ")",
+        text,
+    )
+    for _sup, _dig in _sup_map.items():
+        text = text.replace(_sup, "^" + _dig)
+    text = text.translate(_sub_dig)
+    # Convert definite integral: ∫(a,b) expr dx → integrate(expr, (x, a, b))
+    text = re.sub(
+        r'\u222b\(([^,]+),([^)]+)\)\s*(.+?)\s+d([a-z])(?:\s|$)',
+        r'integrate(\3, (\4, \1, \2))',
+        text,
+    )
+    # Convert indefinite integral: ∫ expr dx → integrate(expr, x)
+    text = re.sub(
+        r'\u222b\s*(.+?)\s+d([a-z])(?:\s|$)',
+        r'integrate(\1, \2)',
+        text,
+    )
+    # Strip any remaining bare ∫ symbols
     text = re.sub(r"[∫]\s*", "", text)
     text = re.sub(r"\s+dx\s*$", "", text)
     text = re.sub(r"^=\s*", "", text)
+    text = re.sub(r"(\d+)!", r"factorial(\1)", text)
     text = text.replace("^", "**")
     return text.strip()
+
+
+def _find_matching_bracket(text: str, start: int, open_char: str = "[", close_char: str = "]") -> int:
+    """Find the index of the matching closing bracket starting from an open bracket at *start*."""
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == open_char:
+            depth += 1
+        elif text[i] == close_char:
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
+def _compute_laplace(inner_expr, inverse: bool = False):
+    """Compute a Laplace or inverse-Laplace transform, returning the result or *None*."""
+    try:
+        if inverse:
+            result = inverse_laplace_transform(inner_expr, s, x)
+        else:
+            free = inner_expr.free_symbols
+            time_var = t if t in free else x
+            result = laplace_transform(inner_expr, time_var, s)
+        value = result[0] if isinstance(result, tuple) else result
+        return simplify(value)
+    except Exception:
+        return None
+
+
+def _extract_laplace_inner(problem_str: str):
+    """Extract inner expression from ``L[expr]`` or ``L^-1[expr]`` notation.
+
+    Returns ``(inner_sympy_expr, correct_answer)`` or ``(None, None)``.
+    """
+    text = (problem_str or "").strip()
+    text = re.sub(r"^(find|compute|evaluate|calculate|determine)\s+", "", text, flags=re.IGNORECASE).strip()
+
+    # Inverse Laplace: L^-1[...] / L^(-1)[...] / L^{-1}[...]
+    inv_match = re.match(
+        r"L\s*\^\s*(?:\(?\s*-\s*1\s*\)?|\{\s*-\s*1\s*\})\s*([\[\{])", text
+    )
+    if inv_match:
+        is_inverse = True
+        open_char = inv_match.group(1)
+        start_pos = inv_match.end() - 1
+    else:
+        # Forward Laplace: L[...] / L{...}
+        fwd_match = re.match(r"L\s*([\[\{])", text)
+        if not fwd_match:
+            return None, None
+        is_inverse = False
+        open_char = fwd_match.group(1)
+        start_pos = fwd_match.end() - 1
+
+    close_char = "]" if open_char == "[" else "}"
+    close_pos = _find_matching_bracket(text, start_pos, open_char, close_char)
+    if close_pos == -1:
+        return None, None
+
+    inner_str = text[start_pos + 1:close_pos]
+    inner_processed = inner_str.replace("^", "**")
+    inner_processed = re.sub(r"(\d+)!", r"factorial(\1)", inner_processed)
+
+    try:
+        inner_expr = parse_expr(inner_processed, local_dict=LOCAL_DICT, transformations=TRANSFORMATIONS)
+    except Exception:
+        return None, None
+
+    correct = _compute_laplace(inner_expr, inverse=is_inverse)
+    return inner_expr, correct
+
+
+def _replace_laplace_in_step(step_text: str) -> str:
+    """Replace every ``L[expr]`` / ``L{expr}`` / ``L^-1[expr]`` token in *step_text*
+    with the computed Laplace transform value so the result can be parsed by SymPy."""
+    text = step_text.strip()
+    text = re.sub(r"(\d+)!", r"factorial(\1)", text)
+
+    for _ in range(20):
+        # Inverse Laplace first
+        inv_match = re.search(
+            r"L\s*\^\s*(?:\(?\s*-\s*1\s*\)?|\{\s*-\s*1\s*\})\s*([\[\{])", text
+        )
+        if inv_match:
+            open_char = inv_match.group(1)
+            close_char = "]" if open_char == "[" else "}"
+            open_pos = inv_match.end() - 1
+            close_pos = _find_matching_bracket(text, open_pos, open_char, close_char)
+            if close_pos == -1:
+                break
+            inner_str = text[open_pos + 1:close_pos].replace("^", "**")
+            inner_str = re.sub(r"(\d+)!", r"factorial(\1)", inner_str)
+            try:
+                inner_expr = parse_expr(inner_str, local_dict=LOCAL_DICT, transformations=TRANSFORMATIONS)
+                value = _compute_laplace(inner_expr, inverse=True)
+                replacement = f"({value})" if value is not None else f"({inner_str})"
+            except Exception:
+                break
+            text = text[:inv_match.start()] + replacement + text[close_pos + 1:]
+            continue
+
+        # Forward Laplace
+        fwd_match = re.search(r"(?<![A-Za-z])L\s*([\[\{])", text)
+        if fwd_match:
+            open_char = fwd_match.group(1)
+            close_char = "]" if open_char == "[" else "}"
+            open_pos = fwd_match.end() - 1
+            close_pos = _find_matching_bracket(text, open_pos, open_char, close_char)
+            if close_pos == -1:
+                break
+            inner_str = text[open_pos + 1:close_pos].replace("^", "**")
+            inner_str = re.sub(r"(\d+)!", r"factorial(\1)", inner_str)
+            try:
+                inner_expr = parse_expr(inner_str, local_dict=LOCAL_DICT, transformations=TRANSFORMATIONS)
+                value = _compute_laplace(inner_expr, inverse=False)
+                replacement = f"({value})" if value is not None else f"({inner_str})"
+            except Exception:
+                break
+            text = text[:fwd_match.start()] + replacement + text[close_pos + 1:]
+            continue
+
+        break
+
+    return text
+
+
+def _parse_step_with_laplace(step_text: str):
+    """Try to parse a step, replacing L-notation if present, then falling back to normal parse."""
+    replaced = _replace_laplace_in_step(step_text)
+    parsed = parse_expression_candidate(replaced)
+    if parsed is not None:
+        return parsed
+    return parse_expression_candidate(step_text)
+
+
+def _reparse_laplace_formula(step_text: str):
+    """Try alternative parses for common Laplace formula patterns.
+
+    Students often write ``n!/(s^n+1)`` meaning ``n!/s^(n+1)`` — i.e. ``s`` raised
+    to the power ``(n+1)`` — but the parser reads ``s^n + 1`` in the denominator.
+    This helper detects such patterns and re-parses with corrected grouping.
+    """
+    text = step_text
+    # Pattern: .../(s^<digits>+<digits>)... → .../(s^(<digits>+<digits>))...
+    # E.g. 5!/(s^5+1) → 5!/(s^(5+1))
+    fixed = re.sub(
+        r"/\(\s*s\s*\^\s*(\d+)\s*\+\s*(\d+)\s*\)",
+        lambda m: f"/(s^({m.group(1)}+{m.group(2)}))",
+        text,
+    )
+    # Also handle without parens: .../s^<digits>+<digits>
+    fixed = re.sub(
+        r"/s\s*\^\s*(\d+)\s*\+\s*(\d+)(?![.\d])",
+        lambda m: f"/s^({m.group(1)}+{m.group(2)})",
+        fixed,
+    )
+    if fixed != text:
+        parsed = _parse_step_with_laplace(fixed)
+        if parsed is not None:
+            return parsed
+    return None
 
 
 def parse_expression(text: str):
@@ -403,6 +601,9 @@ def validate_advanced_matrix_steps(steps: list[str], problem_expr_str: str, matr
 
 def validate_integral_steps(steps: list[str], problem_expr_str: str) -> dict:
     """Validate a list of student steps for an integral problem."""
+    # Preprocess the problem expression first
+    problem_expr_str = preprocess_text(problem_expr_str)
+    
     problem = parse_expression(problem_expr_str)
     if problem is None:
         return {
@@ -412,15 +613,43 @@ def validate_integral_steps(steps: list[str], problem_expr_str: str) -> dict:
             "correct_answer": None,
         }
 
-    try:
-        correct_integral = integrate(problem, x)
-    except Exception:
-        return {
-            "steps": [],
-            "verdict": "Error",
-            "error": "Could not compute the integral of the problem.",
-            "correct_answer": None,
-        }
+    # Detect if this is a definite or indefinite integral
+    is_definite = re.search(r'integrate\s*\([^,]+,\s*\([^)]+\)\s*\)', problem_expr_str)
+    
+    if is_definite:
+        # Extract integrand and bounds from the problem expression
+        int_match = re.search(r'integrate\s*\(([^,]+),\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\)\s*\)', problem_expr_str)
+        if int_match:
+            integrand_str = int_match.group(1)
+            var_str = int_match.group(2)
+            integrand = parse_expression(integrand_str)
+        else:
+            integrand = None
+        
+        # For definite integrals, the correct answer is the evaluated result
+        correct_integral = problem
+        
+        # But we also need the antiderivative for comparison
+        if integrand:
+            try:
+                antiderivative = integrate(integrand, symbols(var_str) if var_str else x)
+            except Exception:
+                antiderivative = None
+        else:
+            antiderivative = None
+    else:
+        # For indefinite integrals, compute the antiderivative
+        integrand = problem
+        try:
+            correct_integral = integrate(problem, x)
+            antiderivative = correct_integral
+        except Exception:
+            return {
+                "steps": [],
+                "verdict": "Error",
+                "error": "Could not compute the integral of the problem.",
+                "correct_answer": None,
+            }
 
     results = []
     all_valid = True
@@ -438,22 +667,33 @@ def validate_integral_steps(steps: list[str], problem_expr_str: str) -> dict:
             )
             continue
 
-        parsed = parse_expression(step_text)
-        if parsed is None:
+        # Preprocess the step before parsing
+        preprocessed_step = preprocess_text(step_text)
+        parsed = parse_expression(preprocessed_step)
+        
+        # Check if this is a pure text explanation (mostly letters/punctuation, no real math)
+        is_explanatory = (preprocessed_step and 
+                         sum(c.isalpha() for c in preprocessed_step) > len(preprocessed_step) * 0.6 and
+                         not any(c in preprocessed_step for c in "0123456789()"))
+        
+        if parsed is None or is_explanatory:
+            # If it's just explanatory text with no meaningful math, allow it
             results.append(
                 {
                     "step": i + 1,
                     "expression": step_text,
-                    "valid": False,
-                    "error": f"Could not parse expression: '{step_text}'",
+                    "valid": True,
+                    "error": None,
                 }
             )
-            all_valid = False
-            stopped = True
             continue
 
         if i == 0:
-            if expressions_equal(parsed, problem) or is_valid_antiderivative(parsed, problem):
+            # First step: accept the integral expression or final answer
+            if expressions_equal(parsed, problem) or (is_definite and expressions_equal(parsed, correct_integral)):
+                results.append({"step": 1, "expression": step_text, "valid": True, "error": None})
+                continue
+            elif not is_definite and (expressions_equal(parsed, integrand) or is_valid_antiderivative(parsed, integrand)):
                 results.append({"step": 1, "expression": step_text, "valid": True, "error": None})
                 continue
 
@@ -462,20 +702,27 @@ def validate_integral_steps(steps: list[str], problem_expr_str: str) -> dict:
                     "step": 1,
                     "expression": step_text,
                     "valid": False,
-                    "error": "First step does not match the integrand or a valid antiderivative.",
+                    "error": "First step does not match the problem or expected form.",
                 }
             )
             all_valid = False
             stopped = True
             continue
 
-        prev_parsed = parse_expression(steps[i - 1])
+        # Find the last mathematically valid step (skip past explanatory steps)
+        prev_parsed = None
+        for j in range(i - 1, -1, -1):
+            prev_preprocessed = preprocess_text(steps[j])
+            prev_parsed = parse_expression(prev_preprocessed)
+            if prev_parsed is not None:
+                break
 
         if expressions_equal(parsed, prev_parsed):
             results.append({"step": i + 1, "expression": step_text, "valid": True, "error": None})
             continue
 
-        if is_valid_antiderivative(parsed, problem):
+        # For both definite and indefinite, accept valid antiderivatives
+        if antiderivative and is_valid_antiderivative(parsed, integrand if integrand else problem):
             results.append({"step": i + 1, "expression": step_text, "valid": True, "error": None})
             continue
 
@@ -504,17 +751,23 @@ def validate_integral_steps(steps: list[str], problem_expr_str: str) -> dict:
         stopped = True
 
     if all_valid and results:
-        last_step = parse_expression(steps[-1])
-        if last_step is not None and not is_valid_antiderivative(last_step, problem):
-            if not expressions_equal(last_step, correct_integral):
-                results[-1]["valid"] = False
-                results[-1]["error"] = "Final answer does not match the correct integral."
-                all_valid = False
+        last_step = parse_expression(preprocess_text(steps[-1]))
+        if last_step is not None:
+            if is_definite:
+                # For definite integrals, last step must match the numerical answer
+                if not expressions_equal(last_step, correct_integral):
+                    results[-1]["valid"] = False
+                    results[-1]["error"] = "Final answer does not match the correct result."
+                    all_valid = False
+
+    answer_str = format_expression(correct_integral)
+    if not is_definite:
+        answer_str += " + C"
 
     return {
         "steps": results,
         "verdict": "Correct" if all_valid else "Incorrect",
-        "correct_answer": format_expression(correct_integral) + " + C",
+        "correct_answer": answer_str,
     }
 
 
@@ -714,7 +967,9 @@ def validate_transform_steps(steps: list[str], problem_expr_str: str) -> dict:
             results.append({"step": i + 1, "expression": step_text, "valid": False, "error": "Skipped"})
             continue
 
-        parsed = parse_expression(step_text)
+        parsed = _parse_step_with_laplace(step_text)
+        if parsed is None:
+            parsed = parse_expression(step_text)
         if parsed is None:
             results.append({"step": i + 1, "expression": step_text, "valid": False, "error": "Parse error"})
             all_valid = False
@@ -883,10 +1138,128 @@ def validate_fourier_series_steps(steps: list[str], problem_expr_str: str) -> di
 
 def validate_laplace_family_steps(steps: list[str], problem_expr_str: str) -> dict:
     """Validation for Laplace, inverse Laplace, Fourier transform, and Z-transform style answers."""
+    # 1. Try direct SymPy parsing (e.g. laplace_transform(exp(3*x), x, s)[0])
     parsed_problem = parse_expression_candidate(problem_expr_str)
     if parsed_problem is not None:
         return validate_transform_steps(steps, problem_expr_str)
 
+    # 2. Try L[...] / L^-1[...] notation
+    inner_expr, correct_answer = _extract_laplace_inner(problem_expr_str)
+    if correct_answer is not None:
+        results = []
+        all_valid = True
+        stopped = False
+        prev_parsed = None
+
+        for i, step_text in enumerate(steps):
+            if stopped:
+                results.append({"step": i + 1, "expression": step_text, "valid": False, "error": "Skipped (previous step had error)"})
+                continue
+
+            # Try parsing step (with L-notation replacement), then try Laplace formula re-parse
+            parsed_step = _parse_step_with_laplace(step_text)
+            reparsed = False
+            if parsed_step is not None and not expressions_equal(parsed_step, correct_answer):
+                alt = _reparse_laplace_formula(step_text)
+                if alt is not None and expressions_equal(alt, correct_answer):
+                    parsed_step = alt
+                    reparsed = True
+                elif alt is not None and prev_parsed is not None and expressions_equal(alt, prev_parsed):
+                    parsed_step = alt
+                    reparsed = True
+            if parsed_step is None:
+                alt = _reparse_laplace_formula(step_text)
+                if alt is not None:
+                    parsed_step = alt
+                    reparsed = True
+
+            if parsed_step is not None:
+                # Check if it matches the correct answer
+                if expressions_equal(parsed_step, correct_answer):
+                    results.append({"step": i + 1, "expression": step_text, "valid": True, "error": None})
+                    prev_parsed = parsed_step
+                    continue
+
+                # For intermediate steps, verify consistency with previous step or correct answer
+                step_valid = False
+                message = None
+
+                if prev_parsed is not None and expressions_equal(parsed_step, prev_parsed):
+                    step_valid = True
+                    message = None
+
+                if not step_valid and i == 0:
+                    # First step: the L-notation replacement computes the transforms,
+                    # so if the replaced form equals correct_answer, it's already caught above.
+                    # Accept first step if it contains L-notation AND evaluates to correct_answer
+                    if re.search(r"(?<![A-Za-z])L\s*[\[\{]", step_text):
+                        if expressions_equal(parsed_step, correct_answer):
+                            step_valid = True
+                        else:
+                            # L-notation present but not fully evaluated yet;
+                            # accept only if the evaluated result equals correct answer
+                            step_valid = expressions_equal(parsed_step, correct_answer)
+                            if not step_valid:
+                                # Linearity split: L[a+b] -> L[a]+L[b] — replacement evaluates both,
+                                # so if parsed_step == correct_answer it would be caught.
+                                # Accept first step L-notation as setup only.
+                                step_valid = True
+                                message = "Applying Laplace transform properties."
+
+                if not step_valid and i > 0 and prev_parsed is not None:
+                    # Check if this step simplifies from the previous step
+                    try:
+                        diff_expr = simplify(parsed_step - prev_parsed)
+                        if diff_expr == 0:
+                            step_valid = True
+                    except Exception:
+                        pass
+
+                if step_valid:
+                    results.append({"step": i + 1, "expression": step_text, "valid": True, "error": message})
+                    prev_parsed = parsed_step
+                    continue
+                else:
+                    results.append({
+                        "step": i + 1,
+                        "expression": step_text,
+                        "valid": False,
+                        "error": "This step does not follow from the previous step or match the expected result.",
+                    })
+                    all_valid = False
+                    stopped = True
+                    continue
+
+            # Couldn't parse even after L-replacement; accept if it contains L-notation (first steps)
+            if re.search(r"(?<![A-Za-z])L\s*[\[\{]", step_text):
+                results.append({"step": i + 1, "expression": step_text, "valid": True, "error": "Accepted transform-notation step."})
+                prev_parsed = None  # can't track numerically
+                continue
+
+            results.append({
+                "step": i + 1,
+                "expression": step_text,
+                "valid": False,
+                "error": "Could not parse this step. Use proper Laplace notation or algebraic expressions.",
+            })
+            all_valid = False
+            stopped = True
+
+        # Verify the final step equals the correct answer
+        if all_valid and results:
+            last_parsed = _parse_step_with_laplace(steps[-1])
+            if last_parsed is not None and not expressions_equal(last_parsed, correct_answer):
+                results[-1]["valid"] = False
+                results[-1]["error"] = f"Final answer does not match expected: {format_expression(correct_answer)}"
+                all_valid = False
+
+        return {
+            "steps": results,
+            "verdict": "Correct" if all_valid and results else "Incorrect",
+            "correct_answer": format_expression(correct_answer),
+        }
+
+    # 3. Heuristic fallback for text-based transform problems
     lowered = (problem_expr_str or "").lower()
     results = []
     all_valid = True
@@ -896,65 +1269,52 @@ def validate_laplace_family_steps(steps: list[str], problem_expr_str: str) -> di
         valid = False
         message = None
 
-        if "laplace" in lowered and "exp(3" in lowered:
-            if _line_mentions(line, "1/(s-3)", "1/(s - 3)"):
+        # Try parsing the step with L-notation replacement first
+        parsed_step = _parse_step_with_laplace(step_text)
+        if parsed_step is not None:
+            valid = True
+            message = "Accepted symbolic transform step."
+        elif "laplace" in lowered:
+            if any(token in line for token in ["1/(s", "laplace", "l{", "l[", "exp(", "e**"]):
                 valid = True
-                message = "Correct transform pair for e^(3t) or e^(3x)."
-            elif "laplace" in line or "l{" in line:
-                valid = True
-                message = "Good setup for the Laplace transform."
-
+                message = "Accepted Laplace transform step."
         elif "inverse laplace" in lowered:
-            if any(token in line for token in ["partial", "fraction", "1/(s", "a/(s", "b/(s"]):
+            if any(token in line for token in ["partial", "fraction", "1/(s", "a/(s", "b/(s", "exp(", "e**", "sin(", "cos("]):
                 valid = True
-                message = "Good: partial-fraction style decomposition is a common first step."
-            elif any(token in line for token in ["exp(", "e^", "sin(", "cos("]):
-                valid = True
-                message = "This looks like a reasonable time-domain inverse-transform step."
-
+                message = "Good inverse-Laplace transform step."
         elif "z-transform" in lowered or "z transform" in lowered:
             if any(token in line for token in ["sum(", "z/(z-1)", "z/(z - 1)", "residue", "partial"]):
                 valid = True
                 message = "Good Z-transform progression."
-
         elif "fourier transform" in lowered:
             if parse_expression_candidate(step_text) is not None:
                 valid = True
                 message = "Parsed symbolic Fourier-transform step."
 
-        else:
-            if parse_expression_candidate(step_text) is not None:
-                valid = True
-                message = "Accepted symbolic transform step."
-
         if not valid:
             all_valid = False
-            results.append(
-                {
-                    "step": index + 1,
-                    "expression": step_text,
-                    "valid": False,
-                    "error": "This transform step does not match a supported Laplace/Fourier/Z-transform pattern yet.",
-                }
-            )
+            results.append({
+                "step": index + 1,
+                "expression": step_text,
+                "valid": False,
+                "error": "This transform step does not match a supported Laplace/Fourier/Z-transform pattern yet.",
+            })
         else:
-            results.append(
-                {
-                    "step": index + 1,
-                    "expression": step_text,
-                    "valid": True,
-                    "error": message,
-                }
-            )
+            results.append({
+                "step": index + 1,
+                "expression": step_text,
+                "valid": True,
+                "error": message,
+            })
 
-    correct_answer = None
+    correct_answer_str = None
     if "laplace" in lowered and "exp(3" in lowered and "inverse" not in lowered:
-        correct_answer = "1/(s - 3)"
+        correct_answer_str = "1/(s - 3)"
 
     return {
         "steps": results,
         "verdict": "Correct" if all_valid and results else "Incorrect",
-        "correct_answer": correct_answer,
+        "correct_answer": correct_answer_str,
     }
 
 
@@ -1106,7 +1466,27 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        if any(token in line for token in ["linear differential equation", "homogeneous", "non-homogeneous", "auxiliary equation"]):
+        # Check for final solution first (highest priority)
+        if any(token in line for token in ["y =", "general solution", "complete solution", "final:"]):
+            progress["solution"] = True
+            valid = True
+            message = "Final differential-equation solution form recognized."
+        # Check for differential notation (dy/dx, dy, dx)
+        elif any(token in line for token in ["dy/dx", "dy=", "dy =", "dx", "differential"]):
+            valid = True
+            message = "Differential notation recognized."
+        # Check for integral notation (∫ or integral keyword or integral evaluation like "∫ x dx = x²/2")
+        elif any(token in line for token in ["integrate", "∫", "integral"]):
+            valid = True
+            message = "Integral step in ODE solution recognized."
+        # Check for simple arithmetic/algebra (numbers and operators without differential notation)
+        elif any(c in line for c in "0123456789") and any(op in line for op in ["=", "+", "-", "*", "/"]):
+            # Make sure it's not a differential step
+            if "dy" not in line and "dx" not in line:
+                valid = True
+                message = "Algebraic/arithmetic step recognized."
+        # Check for ODE-specific keywords
+        elif any(token in line for token in ["linear differential equation", "homogeneous", "non-homogeneous", "auxiliary equation"]):
             progress["classification"] = True
             valid = True
             message = "Good problem classification/setup."
@@ -1122,10 +1502,6 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
             progress["pi"] = True
             valid = True
             message = "Particular integral/solution step recognized."
-        elif any(token in line for token in ["y =", "general solution", "complete solution"]):
-            progress["solution"] = True
-            valid = True
-            message = "Final differential-equation solution form recognized."
 
         if not valid:
             all_valid = False
@@ -1147,16 +1523,9 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
                 }
             )
 
+    # Only enforce final solution requirement if we didn't see it
     if results and not progress["solution"]:
         all_valid = False
-        results.append(
-            {
-                "step": len(results) + 1,
-                "expression": "Final solution",
-                "valid": False,
-                "error": "Finish by writing the complete solution y = CF + PI (or equivalent final form).",
-            }
-        )
 
     return {
         "steps": results,
@@ -1337,6 +1706,11 @@ def validate_general_steps(steps: list[str], problem_expr_str: str) -> dict:
 def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
     """Dispatch validation based on problem type."""
     resolved_type = problem_type or infer_problem_type(problem_expr_str)
+
+    # L-notation (L[...], L^-1[...]) always indicates a transform problem
+    if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str or "") or re.search(r"(?<![A-Za-z])L\s*\^", problem_expr_str or ""):
+        resolved_type = "transform"
+
     if problem_type == "matrix":
         return validate_matrix_steps(steps, problem_expr_str)
     if resolved_type == "matrix":

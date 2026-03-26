@@ -155,6 +155,8 @@ SUBJECTS = [
             "initial value theorem",
             "final value theorem",
             "periodic function",
+            "l[",
+            "l{",
         ],
         "strategy": "transform",
     },
