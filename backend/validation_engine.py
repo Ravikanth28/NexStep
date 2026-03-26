@@ -64,6 +64,21 @@ LOCAL_DICT = {
 }
 
 
+def infer_problem_type(problem_expr_str: str) -> str:
+    lowered = (problem_expr_str or "").lower()
+    if any(keyword in lowered for keyword in ["matrix", "[[", "det(", "determinant", "eigen", "rank"]):
+        return "matrix"
+    if any(keyword in lowered for keyword in ["laplace", "fourier", "z_transform", "inverse_laplace"]):
+        return "transform"
+    if any(keyword in lowered for keyword in ["probability", "bayes", "chi", "anova", "normal(", "poisson", "binomial", "p("]):
+        return "stats"
+    if any(keyword in lowered for keyword in ["gradient", "divergence", "curl", "vector", "del"]):
+        return "vector"
+    if any(keyword in lowered for keyword in ["dy/dx", "d2y", "differential equation"]):
+        return "ode"
+    return "integral"
+
+
 def preprocess_text(text: str) -> str:
     """Clean up student input for parsing."""
     text = text.strip()
@@ -603,13 +618,72 @@ def validate_transform_steps(steps: list[str], problem_expr_str: str) -> dict:
     }
 
 
+def validate_general_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Fallback validator for questions that are hard to classify exactly."""
+    parsed_problem = parse_expression_candidate(problem_expr_str)
+    if parsed_problem is None:
+        return {
+            "steps": [
+                {
+                    "step": index + 1,
+                    "expression": step,
+                    "valid": True,
+                    "error": None,
+                }
+                for index, step in enumerate(steps)
+            ],
+            "verdict": "Review Required",
+            "correct_answer": None,
+            "error": "The system could not fully parse this advanced problem, so it preserved the student steps for teacher review.",
+        }
+
+    results = []
+    all_valid = True
+    for index, step_text in enumerate(steps):
+        parsed_step = parse_expression_candidate(step_text)
+        if parsed_step is None:
+            results.append(
+                {
+                    "step": index + 1,
+                    "expression": step_text,
+                    "valid": False,
+                    "error": "Could not parse this step. Try using keyboard symbols or a simpler SymPy-style expression.",
+                }
+            )
+            all_valid = False
+            continue
+
+        if index == len(steps) - 1 and expressions_equal(parsed_step, parsed_problem):
+            results.append({"step": index + 1, "expression": step_text, "valid": True, "error": None})
+        else:
+            results.append(
+                {
+                    "step": index + 1,
+                    "expression": step_text,
+                    "valid": True,
+                    "error": "Accepted as an intermediate step under general validation.",
+                }
+            )
+
+    return {
+        "steps": results,
+        "verdict": "Correct" if all_valid and results else "Needs Review",
+        "correct_answer": format_expression(parsed_problem),
+    }
+
+
 def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
     """Dispatch validation based on problem type."""
+    resolved_type = problem_type or infer_problem_type(problem_expr_str)
     if problem_type == "matrix":
         return validate_matrix_steps(steps, problem_expr_str)
-    if problem_type in ["transform", "vector", "stats"]:
+    if resolved_type == "matrix":
+        return validate_matrix_steps(steps, problem_expr_str)
+    if resolved_type in ["transform", "vector", "stats"]:
         return validate_transform_steps(steps, problem_expr_str)
-    return validate_integral_steps(steps, problem_expr_str)
+    if resolved_type == "integral":
+        return validate_integral_steps(steps, problem_expr_str)
+    return validate_general_steps(steps, problem_expr_str)
 
 
 def get_hint(problem_expr_str: str, step_number: int = 0) -> str:

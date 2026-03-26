@@ -35,6 +35,26 @@ def ensure_schema():
         statements.append(
             text("ALTER TABLE questions ADD COLUMN allow_copy_paste BOOLEAN NOT NULL DEFAULT TRUE")
         )
+    if "subject" not in question_columns:
+        statements.append(
+            text("ALTER TABLE questions ADD COLUMN subject VARCHAR(120) NOT NULL DEFAULT 'Engineering Mathematics'")
+        )
+    if "unit_name" not in question_columns:
+        statements.append(
+            text("ALTER TABLE questions ADD COLUMN unit_name VARCHAR(150) NOT NULL DEFAULT 'General Problem Solving'")
+        )
+    if "concept_tags" not in question_columns:
+        statements.append(
+            text("ALTER TABLE questions ADD COLUMN concept_tags TEXT NOT NULL DEFAULT '[]'")
+        )
+    if "validation_strategy" not in question_columns:
+        statements.append(
+            text("ALTER TABLE questions ADD COLUMN validation_strategy VARCHAR(50) NOT NULL DEFAULT 'integral'")
+        )
+    if "analysis_confidence" not in question_columns:
+        statements.append(
+            text("ALTER TABLE questions ADD COLUMN analysis_confidence DOUBLE PRECISION NOT NULL DEFAULT 0")
+        )
 
     if not statements:
         return

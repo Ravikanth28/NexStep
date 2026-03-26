@@ -40,6 +40,8 @@ export const getQuestions = (difficulty, topic) => {
 export const getQuestion = (id) => request(`/questions/${id}`);
 export const createQuestion = (body) => request('/questions', { method: 'POST', body: JSON.stringify(body) });
 export const deleteQuestion = (id) => request(`/questions/${id}`, { method: 'DELETE' });
+export const analyzeQuestion = (body) => request('/questions/analyze', { method: 'POST', body: JSON.stringify(body) });
+export const getSyllabusMeta = () => request('/questions/meta/syllabus');
 
 // Validation
 export const validateSteps = (body) => request('/validate', { method: 'POST', body: JSON.stringify(body) });
