@@ -12,7 +12,8 @@ const SYMBOLS = {
     { label: 'ln', insert: 'ln(' },
   ],
   Calculus: [
-    { label: '∫', insert: '∫' }, { label: 'd/dx', insert: 'd/dx ' }, { label: '∂', insert: '∂' },
+    { label: '∫', insert: '∫ ' }, { label: '∫ₐᵇ', insert: '∫(a,b) ', selectStart: 2, selectEnd: 3 },
+    { label: 'd/dx', insert: 'd/dx ' }, { label: '∂', insert: '∂' },
     { label: 'lim', insert: 'lim(' }, { label: '∑', insert: 'sum(' }, { label: '∏', insert: 'prod(' },
     { label: '+ C', insert: ' + C' }, { label: 'dx', insert: ' dx' },
   ],
@@ -66,7 +67,7 @@ export default function MathKeyboard({ onInsert }) {
           <button
             key={idx}
             className="key-btn"
-            onClick={() => onInsert(sym.insert)}
+            onClick={() => onInsert(sym.insert, sym.selectStart, sym.selectEnd)}
             type="button"
           >
             {sym.label}

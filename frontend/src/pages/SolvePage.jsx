@@ -58,7 +58,7 @@ export default function SolvePage() {
     }
   };
 
-  const handleInsertSymbol = (symbol) => {
+  const handleInsertSymbol = (symbol, selectStart, selectEnd) => {
     const editor = textareaRef.current;
     if (!editor) return;
 
@@ -70,7 +70,12 @@ export default function SolvePage() {
 
     setTimeout(() => {
       editor.focus();
-      editor.setSelectionRange(start + symbol.length, start + symbol.length);
+      if (selectStart !== undefined && selectEnd !== undefined) {
+        // Highlight the placeholder so the user can type over it
+        editor.setSelectionRange(start + selectStart, start + selectEnd);
+      } else {
+        editor.setSelectionRange(start + symbol.length, start + symbol.length);
+      }
     }, 0);
   };
 
