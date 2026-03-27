@@ -1457,20 +1457,33 @@ def validate_ode_steps(steps: list[str], problem_expr_str: str) -> dict:
     all_valid = True
     progress = {"classification": False, "aux": False, "cf": False, "pi": False, "solution": False}
     expected_flow = []
+    is_first_order = "dy/dx" in lowered_problem and "d2y" not in lowered_problem
 
-    if any(token in lowered_problem for token in ["constant coefficient", "d2y", "dy/dx", "differential equation"]):
+    if is_first_order:
+        expected_flow = ["integrate the derivative", "general solution", "apply initial condition", "final solution"]
+    elif any(token in lowered_problem for token in ["constant coefficient", "d2y", "differential equation"]):
         expected_flow = ["auxiliary equation", "roots", "complementary function", "particular integral", "final solution"]
 
     for index, step_text in enumerate(steps):
         line = preprocess_text(step_text).lower()
+        compact = re.sub(r"\s+", "", line)
         valid = False
         message = None
+        solution_like = (
+            re.search(r"\by\s*=", line)
+            or re.search(r"\by\([^)]*\)\s*=", line)
+            or any(token in line for token in ["general solution", "complete solution", "final:"])
+        )
+        integration_like = any(token in line for token in ["dx", "integrate", "âˆ«", "integral"])
 
         # Check for final solution first (highest priority)
-        if any(token in line for token in ["y =", "general solution", "complete solution", "final:"]):
+        if solution_like and not integration_like:
             progress["solution"] = True
             valid = True
-            message = "Final differential-equation solution form recognized."
+            if "c" in compact:
+                message = "General differential-equation solution form recognized."
+            else:
+                message = "Final differential-equation solution form recognized."
         # Check for differential notation (dy/dx, dy, dx)
         elif any(token in line for token in ["dy/dx", "dy=", "dy =", "dx", "differential"]):
             valid = True

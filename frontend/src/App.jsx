@@ -10,56 +10,45 @@ import TeacherDashboard from './pages/TeacherDashboard';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
-
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   return (
     <nav className="navbar">
-      <Link to="/" className="navbar-brand" style={{ textDecoration: 'none' }}>
-        <span className="brand-mark">Nx</span>
-        <span>NexStep Maths Explorer</span>
+      <Link to="/" className="navbar-brand">
+        <div className="brand-mark">Nx</div>
+        <div className="brand-info">
+          <div style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.01em' }}>NexStep</div>
+        </div>
       </Link>
+
       <div className="navbar-links">
         {user ? (
           <>
+            <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>Workspace</Link>
             {user.role === 'student' && (
-              <>
-                <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>
-                  Practice
-                </Link>
-                <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>
-                  Progress
-                </Link>
-              </>
+              <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>Telemetry</Link>
             )}
             {user.role === 'teacher' && (
-              <Link to="/teacher" className={`nav-link ${isActive('/teacher') ? 'active' : ''}`}>
-                Workspace
-              </Link>
+              <Link to="/teacher" className={`nav-link ${isActive('/teacher') ? 'active' : ''}`}>Control</Link>
             )}
-            <div className="nav-user">
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                {user.username}
-                <span className={`badge ${user.role === 'teacher' ? 'badge-medium' : 'badge-easy'}`} style={{ marginLeft: '8px' }}>
-                  {user.role}
-                </span>
-              </span>
-              <button className="nav-btn outline" onClick={onLogout}>
-                Logout
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '12px', paddingLeft: '16px', borderLeft: '1px solid var(--border-main)' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{user.username}</div>
+                <div className="badge badge-easy" style={{ fontSize: '0.65rem', padding: '2px 8px', marginTop: '4px' }}>{user.role}</div>
+              </div>
+              <button className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.8rem' }} onClick={onLogout}>Logout</button>
             </div>
           </>
         ) : (
           <>
-            <Link to="/login" className="nav-btn outline">Sign In</Link>
-            <Link to="/signup" className="nav-btn primary">Launch Platform</Link>
+            <Link to="/login" className="nav-link">Sign In</Link>
+            <Link to="/signup" className="btn btn-primary" style={{ padding: '10px 24px' }}>Start Free</Link>
           </>
         )}
       </div>
     </nav>
   );
 }
-
 function ProtectedRoute({ children, user, requiredRole }) {
   if (!user) return <Navigate to="/login" replace />;
   if (requiredRole && user.role !== requiredRole) return <Navigate to="/" replace />;
@@ -70,66 +59,86 @@ function HomePage({ user }) {
   const navigate = useNavigate();
 
   return (
-    <div className="landing-page">
-      <section className="landing-hero">
-        <div className="landing-copy slide-up">
-          <div className="hero-kicker">Dynamic Engineering Mathematics Platform</div>
-          <h1>From syllabus to solution validation, all in one guided workspace.</h1>
-          <p>
-            Teachers can post fresh questions from matrices, transforms, probability, or vector calculus.
-            Students can solve them line by line in a symbol-aware editor and get structured validation feedback.
-          </p>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            {user ? (
-              <button className="btn btn-primary btn-lg" onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/questions')}>
-                Open {user.role === 'teacher' ? 'Teacher Workspace' : 'Practice Hub'}
-              </button>
-            ) : (
-              <>
-                <button className="btn btn-primary btn-lg" onClick={() => navigate('/signup')}>
-                  Create Account
+    <div className="page">
+      <div className="container">
+        <section className="workspace-hero">
+          <div>
+            <div className="hero-kicker">Neural Symbolic Engine v4.0</div>
+            <h1 className="hero-title">
+              Mathematical <span className="text-gradient">Precision.</span><br />
+              Intelligence Driven.
+            </h1>
+            <p className="hero-subtitle">
+              A high-performance workspace for deep mathematical exploration, combining symbolic reasoning with neural accuracy.
+            </p>
+
+            <div style={{ display: 'flex', gap: '16px', marginTop: '40px' }}>
+              {user ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/questions')}
+                >
+                  Enter Command Studio &rarr;
                 </button>
-                <button className="btn btn-outline btn-lg" onClick={() => navigate('/login')}>
-                  Sign In
-                </button>
-              </>
-            )}
+              ) : (
+                <>
+                  <button className="btn btn-primary" onClick={() => navigate('/signup')}>Initialize Studio</button>
+                  <button className="btn btn-outline" onClick={() => navigate('/login')}>Authenticate</button>
+                </>
+              )}
+            </div>
+          </div>
+          
+          <div className="card" style={{ background: 'rgba(0,0,0,0.4)', borderColor: 'var(--accent-primary)', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <div className="badge badge-easy">Live Processing</div>
+              <div style={{ color: 'var(--accent-primary)', fontFamily: 'JetBrains Mono' }}>SYS-OK</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ width: '4px', background: 'var(--accent-primary)', borderRadius: '2px' }}></div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Neural Parsing</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Vector calculus, tensor fields, ODEs</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <div style={{ width: '4px', background: 'var(--accent-secondary)', borderRadius: '2px' }}></div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Symbolic Routing</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Automated strategy selection & verification</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', opacity: 0.5 }}>
+                <div style={{ width: '4px', background: 'var(--text-muted)', borderRadius: '2px' }}></div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Resolution Engine</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Rigorous step-by-step symbolic checks</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-value text-gradient">99.8%</div>
+            <div className="stat-label">Model Accuracy</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">12.4k</div>
+            <div className="stat-label">Derivations Proved</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">4.0</div>
+            <div className="stat-label">Engine Version</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value text-gradient">Instant</div>
+            <div className="stat-label">Response Time</div>
           </div>
         </div>
-
-        <div className="hero-stage">
-          <div className="hero-orbit orbit-one"></div>
-          <div className="hero-orbit orbit-two"></div>
-          <div className="hero-panel card">
-            <div className="hero-panel-label">Live Workflow</div>
-            <div className="hero-flow-step">
-              <strong>1. Teacher enters question</strong>
-              <p>Raw engineering math problem text or symbolic expression.</p>
-            </div>
-            <div className="hero-flow-step">
-              <strong>2. System maps the syllabus</strong>
-              <p>Topic, unit, strategy, and difficulty are inferred dynamically.</p>
-            </div>
-            <div className="hero-flow-step">
-              <strong>3. Student writes full steps</strong>
-              <p>Every line is checked with topic-aware feedback and reference answers.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="landing-strip">
-        {[
-          ['Dynamic Mapping', 'Questions do not need to be pre-stored one by one.'],
-          ['Step Validation', 'Students write complete working, not only final answers.'],
-          ['Teacher Visibility', 'Dashboards and exports show accuracy and performance trends.'],
-        ].map(([title, description]) => (
-          <div key={title} className="card feature-panel">
-            <h3>{title}</h3>
-            <p>{description}</p>
-          </div>
-        ))}
-      </section>
+      </div>
     </div>
   );
 }
@@ -167,31 +176,46 @@ export default function App() {
         <Route path="/" element={<HomePage user={user} />} />
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         <Route path="/signup" element={<SignupPage onLogin={handleLogin} />} />
-        <Route path="/questions" element={
-          <ProtectedRoute user={user}>
-            <QuestionsPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/solve/:id" element={
-          <ProtectedRoute user={user}>
-            <SolvePage />
-          </ProtectedRoute>
-        } />
-        <Route path="/teacher" element={
-          <ProtectedRoute user={user} requiredRole="teacher">
-            <TeacherDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/progress" element={
-          <ProtectedRoute user={user} requiredRole="student">
-            <StudentDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/submission-report" element={
-          <ProtectedRoute user={user} requiredRole="student">
-            <SubmissionReportPage />
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/questions"
+          element={(
+            <ProtectedRoute user={user}>
+              <QuestionsPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/solve/:id"
+          element={(
+            <ProtectedRoute user={user}>
+              <SolvePage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/teacher"
+          element={(
+            <ProtectedRoute user={user} requiredRole="teacher">
+              <TeacherDashboard />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/progress"
+          element={(
+            <ProtectedRoute user={user} requiredRole="student">
+              <StudentDashboard />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/submission-report/:submissionId"
+          element={(
+            <ProtectedRoute user={user} requiredRole="student">
+              <SubmissionReportPage />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
