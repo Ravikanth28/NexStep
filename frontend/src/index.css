@@ -244,6 +244,9 @@ input::placeholder, textarea::placeholder {
   flex: 1;
   padding: 32px;
   animation: fadeIn 0.4s ease-out;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 .page-header {
   margin-bottom: 32px;
@@ -693,11 +696,7 @@ input::placeholder, textarea::placeholder {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  overflow: hidden;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 400px;
+  overflow: visible;
 }
 .console-header {
   display: flex;
@@ -721,9 +720,7 @@ input::placeholder, textarea::placeholder {
   font-weight: 500;
 }
 .console-body {
-  flex: 1;
   padding: 16px;
-  overflow-y: auto;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.9rem;
 }
@@ -1392,11 +1389,12 @@ input::placeholder, textarea::placeholder {
 .code-editor-container {
   display: grid;
   grid-template-columns: 56px 1fr;
-  min-height: 430px;
+  flex: 1;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-color);
   background: rgba(7, 14, 18, 0.9);
+  min-height: 0;
 }
 
 .line-numbers {
@@ -1417,7 +1415,7 @@ input::placeholder, textarea::placeholder {
 }
 
 .code-textarea {
-  min-height: 430px;
+  flex: 1;
   resize: vertical;
   border: none;
   border-radius: 0;
@@ -1425,6 +1423,7 @@ input::placeholder, textarea::placeholder {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.95rem;
   line-height: 1.75;
+  min-height: 0;
 }
 
 .math-keyboard {
