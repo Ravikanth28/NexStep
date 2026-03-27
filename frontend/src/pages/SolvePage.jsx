@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getHint as apiGetHint, getQuestion, validateSteps } from '../api';
 import MathKeyboard from '../components/MathKeyboard';
@@ -221,9 +221,9 @@ export default function SolvePage() {
           </div>
         </section>
 
-        <div className="builder-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-          <main>
-            <div className="card" style={{ padding: '0', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', gap: '32px', position: 'relative' }}>
+          <main style={{ flex: 1, minWidth: 0 }}>
+            <div className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '24px 32px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-main)' }}>
                 <h3 style={{ fontSize: '1rem', margin: 0 }}>Symbolic Input [UTF-8]</h3>
               </div>
@@ -232,8 +232,8 @@ export default function SolvePage() {
                 <MathKeyboard onInsert={handleInsertSymbol} />
               </div>
 
-              <div style={{ flex: 1, display: 'flex', minHeight: '400px', background: '#000' }}>
-                <div style={{ width: '50px', borderRight: '1px solid var(--border-main)', padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'JetBrains Mono' }} ref={lineNumbersRef}>
+              <div style={{ height: '400px', display: 'flex', overflow: 'hidden', background: '#000' }}>
+                <div style={{ width: '50px', borderRight: '1px solid var(--border-main)', padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'JetBrains Mono', overflowY: 'hidden' }} ref={lineNumbersRef}>
                   {lines.map((_, i) => <div key={i} style={{ height: '24px', lineHeight: '24px' }}>{i + 1}</div>)}
                 </div>
                 <textarea
@@ -253,7 +253,8 @@ export default function SolvePage() {
                     fontSize: '1.1rem',
                     lineHeight: '24px',
                     color: 'var(--accent-primary)',
-                    outline: 'none'
+                    outline: 'none',
+                    overflowY: 'auto'
                   }}
                 />
               </div>
@@ -276,13 +277,13 @@ export default function SolvePage() {
             </div>
           </main>
 
-          <aside>
-            <div className="card" style={{ padding: '0', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column', background: 'rgba(5, 8, 17, 0.5)' }}>
+          <aside style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+            <div className="card" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'rgba(5, 8, 17, 0.5)' }}>
               <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)' }}>
                 <h3 style={{ fontSize: '1rem', margin: 0 }}>Validation Telemetry</h3>
               </div>
 
-              <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+              <div style={{ flex: 1, padding: '32px', overflowY: 'auto', minHeight: 0 }}>
                 {!results && !validationError ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.3 }}>
                     <div style={{ fontSize: '4rem', marginBottom: '20px' }}>⚙️</div>
@@ -302,10 +303,6 @@ export default function SolvePage() {
                           <div style={{ fontSize: '0.7rem', fontWeight: 800, marginBottom: '4px' }}>VERDICT</div>
                           <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{verdict === 'Correct' ? 'PROVED' : 'FAILED'}</div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 800, marginBottom: '4px' }}>CONFIDENCE</div>
-                          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-primary)' }}>100%</div>
-                        </div>
                       </div>
                     )}
 
@@ -319,20 +316,20 @@ export default function SolvePage() {
                         {res.error && <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--accent-danger)', opacity: 0.8 }}>↳ {res.error}</div>}
                       </div>
                     ))}
+
+                    {feedback && (
+                      <div style={{ padding: '24px', background: 'rgba(255, 255, 255, 0.03)', borderTop: '1px solid var(--border-main)', marginTop: '8px' }}>
+                        <div className="hero-kicker" style={{ fontSize: '0.65rem' }}>AI Learning Feedback</div>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.5', marginTop: '12px' }}>{feedback.summary}</p>
+                        <div className="chip-wrap" style={{ marginTop: '20px' }}>
+                          {feedback.strengths.slice(0, 2).map(s => <div className="badge badge-easy" key={s} style={{ fontSize: '0.6rem' }}>{s}</div>)}
+                          {feedback.mistakes.slice(0, 2).map(m => <div className="badge badge-hard" key={m} style={{ fontSize: '0.6rem' }}>{m}</div>)}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-
-              {feedback && (
-                <div style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.03)', borderTop: '1px solid var(--border-main)' }}>
-                  <div className="hero-kicker" style={{ fontSize: '0.65rem' }}>AI Learning Feedback</div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.5', marginTop: '12px' }}>{feedback.summary}</p>
-                  <div className="chip-wrap" style={{ marginTop: '20px' }}>
-                    {feedback.strengths.slice(0, 2).map(s => <div className="badge badge-easy" key={s} style={{ fontSize: '0.6rem' }}>{s}</div>)}
-                    {feedback.mistakes.slice(0, 2).map(m => <div className="badge badge-hard" key={m} style={{ fontSize: '0.6rem' }}>{m}</div>)}
-                  </div>
-                </div>
-              )}
             </div>
           </aside>
         </div>

@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "expression": "dy/dx = (x**2 + 2*x) / (y + 1)",
+      "valid": true,
+      "error": "Valid ODE setup."
+    },
+    {
+      "step": 2,
+      "expression": "(y + 1) dy = (x**2 + 2*x) dx",
+      "valid": true,
+      "error": "Differential notation recognized."
+    },
+    {
+      "step": 3,
+      "expression": "\u222b (y + 1) dy = \u222b (x**2 + 2*x) dx",
+      "valid": false,
+      "error": "Incorrect integration."
+    },
+    {
+      "step": 4,
+      "expression": "y**2/2 + y = x**3/3 + x**2 + C",
+      "valid": false,
+      "error": "Incorrect solution for this ODE."
+    },
+    {
+      "step": 5,
+      "expression": "1**2/2 + 1 = 0**3/3 + 0**2 + C",
+      "valid": true,
+      "error": "Initial value substitution recognized."
+    },
+    {
+      "step": 6,
+      "expression": "C = 3/2",
+      "valid": true,
+      "error": "Valid arithmetic step solving for C."
+    },
+    {
+      "step": 7,
+      "expression": "y**2/2 + y = x**3/3 + x**2 + 3/2",
+      "valid": false,
+      "error": "Incorrect solution for this ODE."
+    }
+  ],
+  "verdict": "Incorrect",
+  "correct_answer": "Expected flow: integrate the derivative -> general solution -> apply initial condition -> final solution"
+}

@@ -390,7 +390,7 @@ export default function TeacherDashboard() {
                     </div>
                     <div className="problem">{question.problem_expr}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px', borderTop: '1px solid var(--border-main)', paddingTop: '24px' }}>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: {question.id.slice(0, 8)}...</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: #{question.id}</div>
                       <button className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.8rem', borderColor: 'var(--accent-danger)', color: 'var(--accent-danger)' }} onClick={() => handleDelete(question.id)}>Purge</button>
                     </div>
                   </div>
