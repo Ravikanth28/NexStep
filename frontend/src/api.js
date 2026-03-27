@@ -49,6 +49,8 @@ export const getHint = (body) => request('/hint', { method: 'POST', body: JSON.s
 
 // Submissions
 export const getSubmissions = () => request('/submissions');
+export const getSubmission = (id) => request(`/submissions/${id}`);
+export const deleteSubmission = (id) => request(`/submissions/${id}`, { method: 'DELETE' });
 
 // Dashboard
 export const getTeacherDashboard = () => request('/dashboard/teacher');

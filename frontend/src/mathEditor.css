@@ -1,140 +1,125 @@
-/* Math Keyboard Styles */
+/* Neural Keyboard & Editor Integration */
+
 .math-keyboard {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  margin-bottom: 16px;
+  box-shadow: var(--shadow-main);
 }
 
 .keyboard-tabs {
   display: flex;
-  background: var(--surface-light);
-  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border-main);
 }
 
 .tab-btn {
   flex: 1;
-  padding: 10px;
+  padding: 14px;
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   cursor: pointer;
   transition: all 0.2s;
   border-bottom: 2px solid transparent;
 }
 
 .tab-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
+  background: rgba(255,255,255,0.05);
+  color: white;
 }
 
 .tab-btn.active {
-  color: #ef4444; /* Screenshot has a red dominant theme for the keyboard headers */
-  border-bottom-color: #ef4444;
-  background: var(--surface);
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+  background: rgba(0, 242, 255, 0.05);
 }
 
 .keyboard-keys {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: 8px;
-  padding: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 10px;
+  padding: 20px;
 }
 
 .key-btn {
-  padding: 12px 8px;
-  background: var(--surface-light);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", serif;
+  height: 48px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  color: white;
+  font-family: "JetBrains Mono", monospace;
   font-size: 1.1rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .key-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: #ef4444;
-  transform: translateY(-1px);
+  background: var(--grad-surface);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 242, 255, 0.2);
 }
 
 .key-btn:active {
-  transform: translateY(1px);
+  transform: translateY(0);
 }
 
-/* Code Editor Styles */
-.code-editor-container {
-  display: flex;
-  background: var(--surface-dark, #1a1a2e);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  min-height: 250px;
+/* IDE Container */
+.math-editor {
+  background: var(--bg-darker);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-main);
   position: relative;
+  transition: border-color 0.3s;
 }
 
-.line-numbers {
-  padding: 16px 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-right: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1rem;
-  text-align: right;
-  user-select: none;
-  min-width: 40px;
+.math-editor:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 30px rgba(0, 242, 255, 0.1);
+}
+
+.math-console {
+  background: var(--bg-darker);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
   overflow: hidden;
+  height: 100%;
 }
 
-.line-number-cell {
-  height: 24px;
-  line-height: 24px;
+.console-header {
+  padding: 16px 24px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.code-textarea {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: #e2e8f0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1rem;
-  line-height: 24px;
-  padding: 16px;
-  resize: vertical;
-  outline: none;
-  min-height: 250px;
-  white-space: pre;
-  overflow: auto;
+.console-dot {
+  width: 10px;
+  height: 100%; /* logic fixed below */
 }
+.console-dot { width: 10px; height: 10px; border-radius: 50%; }
+.console-dot.red { background: var(--accent-danger); }
+.console-dot.yellow { background: var(--accent-warning); }
+.console-dot.green { background: var(--accent-success); }
 
-.code-textarea::placeholder {
+.console-title {
+  margin-left: 8px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--text-muted);
-  font-style: italic;
-}
-
-.code-textarea:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-/* Adjust Solve Layout to give editor more prominence */
-.solver-layout {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 24px;
-  margin-top: 24px;
-  align-items: start;
-}
-
-@media (max-width: 1024px) {
-  .solver-layout {
-    grid-template-columns: 1fr;
-  }
 }

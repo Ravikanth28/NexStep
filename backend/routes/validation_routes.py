@@ -139,3 +139,64 @@ def get_submissions(
         }
         for s in submissions
     ]
+
+
+@router.get("/submissions/{submission_id}")
+def get_submission_detail(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user)
+):
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id,
+        Submission.user_id == current_user.id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    step_logs = sorted(submission.step_logs, key=lambda step: step.step_number)
+    steps = [
+        {
+            "step": step.step_number,
+            "expression": step.expression,
+            "valid": step.is_valid,
+            "error": step.error_message,
+        }
+        for step in step_logs
+    ]
+    question = submission.question
+
+    return {
+        "id": submission.id,
+        "question_id": submission.question_id,
+        "question_title": question.title if question else "Unknown",
+        "problem_expr": question.problem_expr if question else "",
+        "topic": question.topic if question else "",
+        "subject": question.subject if question else "",
+        "unit_name": question.unit_name if question else "",
+        "validation_strategy": question.validation_strategy if question else "",
+        "is_correct": submission.is_correct,
+        "score": submission.score,
+        "submitted_at": str(submission.submitted_at),
+        "steps": steps,
+        "verdict": "Correct" if submission.is_correct else "Incorrect",
+        "correct_answer": None,
+    }
+
+
+@router.delete("/submissions/{submission_id}")
+def delete_submission(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user)
+):
+    submission = db.query(Submission).filter(
+        Submission.id == submission_id,
+        Submission.user_id == current_user.id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    db.delete(submission)
+    db.commit()
+    return {"message": "Submission deleted successfully"}
