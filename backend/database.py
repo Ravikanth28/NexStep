@@ -16,7 +16,7 @@ if DB_URL.startswith("postgres://"):
 if DB_URL.startswith("sqlite"):
     raise RuntimeError("SQLite is disabled for this backend. Set DATABASE_URL to the hosted PostgreSQL database.")
 
-engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=300, pool_size=5, max_overflow=10)
+engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=280, pool_size=5, max_overflow=10) # neon db timeout safe
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

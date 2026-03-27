@@ -135,6 +135,24 @@ h1, h2, h3, h4 {
   gap: 32px;
 }
 
+/* -- Page layouts -- */
+.page-header {
+  margin-bottom: 32px;
+}
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  background: var(--grad-main);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.page-header p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
 .nav-link {
   color: var(--text-secondary);
   font-weight: 500;
@@ -383,6 +401,152 @@ h1, h2, h3, h4 {
   box-shadow: 0 40px 100px -20px rgba(0,0,0,0.8);
 }
 
+/* -- Action bar -- */
+.action-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn-run {
+  padding: 12px 28px;
+  background: linear-gradient(135deg, var(--accent-success), #00cc7d);
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+.btn-run:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.3);
+}
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+.btn-run.running {
+  animation: pulse-glow 1.5s infinite;
+}
+
+/* -- Output Panel -- */
+.output-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.output-console {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
+  overflow: visible;
+}
+.console-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border-main);
+}
+.console-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.console-dot.red { background: #ef4444; }
+.console-dot.yellow { background: #f59e0b; }
+.console-dot.green { background: #10b981; }
+.console-title {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.console-body {
+  padding: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+}
+.console-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  gap: 12px;
+}
+.console-empty .icon {
+  font-size: 3rem;
+  opacity: 0.3;
+}
+.step-result {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  animation: stepReveal 0.3s ease-out forwards;
+  opacity: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.step-result .result-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.step-result.valid {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid var(--accent-success);
+}
+.step-result.invalid {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid var(--accent-danger);
+}
+.step-result .step-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 60px;
+}
+.step-result .step-expr {
+  color: var(--text-primary);
+}
+.step-result .step-error {
+  color: #f87171;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+.verdict-box {
+  padding: 20px;
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  animation: slideUp 0.5s ease-out;
+}
+.verdict-box.correct {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+.verdict-box.incorrect {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+.correct-answer {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  font-weight: 400;
+}
+
 /* -- Table Styles -- */
 .data-table {
   width: 100%;
@@ -506,6 +670,117 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--accent-primary);
   background: rgba(255,255,255,0.06);
   box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
+}
+
+.question-toolbar {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.question-subline {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.question-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.syllabus-card {
+  border-radius: 22px;
+  border: 1px solid var(--border-main);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+    rgba(14, 26, 34, 0.86);
+}
+
+.align-left {
+  text-align: left;
+}
+
+.syllabus-mini-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.syllabus-mini-item p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.hero-expression {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--border-main);
+  background: rgba(255, 255, 255, 0.04);
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent-primary);
+}
+
+.code-editor-container {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  flex: 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-main);
+  background: rgba(7, 14, 18, 0.9);
+  min-height: 0;
+}
+
+.line-numbers {
+  padding: 16px 0;
+  background: rgba(255, 255, 255, 0.03);
+  border-right: 1px solid var(--border-main);
+  overflow: hidden;
+}
+
+.line-number-cell {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+}
+
+.code-textarea {
+  flex: 1;
+  resize: vertical;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.95rem;
+  line-height: 1.75;
+  min-height: 0;
+}
+
+.math-keyboard {
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-main);
+  background: rgba(14, 25, 32, 0.86);
+}
+
+.keyboard-tabs,
+.keyboard-keys {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 label {

@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "expression": "\u222b dy = \u222b (2x + 1) dx",
+      "valid": true,
+      "error": "Valid integration setup for solution."
+    },
+    {
+      "step": 2,
+      "expression": "y = x**2 + x",
+      "valid": true,
+      "error": "Valid ODE solution step."
+    }
+  ],
+  "verdict": "Correct",
+  "correct_answer": "Expected flow: integrate the derivative -> general solution -> apply initial condition -> final solution"
+}

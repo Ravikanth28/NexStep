@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "expression": "dy/dx=2x+2",
+      "valid": true,
+      "error": "Differential notation recognized."
+    },
+    {
+      "step": 2,
+      "expression": "dy/dx=2x+1",
+      "valid": true,
+      "error": "Differential notation recognized."
+    }
+  ],
+  "verdict": "Incorrect",
+  "correct_answer": "Expected flow: integrate the derivative -> general solution -> apply initial condition -> final solution"
+}
