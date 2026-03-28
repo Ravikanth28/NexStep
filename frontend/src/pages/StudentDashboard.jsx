@@ -2,6 +2,43 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteSubmission, getStudentDashboard } from '../api';
 
+function MasteryHeatmap({ mastery }) {
+  const categories = Object.keys(mastery || {});
+  
+  if (categories.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+        Insufficient data for neural mapping.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+      {categories.map(cat => (
+        <div key={cat} style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-main)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{cat.toUpperCase()}</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: mastery[cat] > 80 ? 'var(--accent-success)' : mastery[cat] > 50 ? 'var(--accent-warning)' : 'var(--accent-danger)' }}>
+              {mastery[cat]}%
+            </span>
+          </div>
+          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div 
+              style={{ 
+                width: `${mastery[cat]}%`, 
+                height: '100%', 
+                background: mastery[cat] > 80 ? 'var(--accent-success)' : mastery[cat] > 50 ? 'var(--accent-warning)' : 'var(--accent-danger)',
+                boxShadow: `0 0 10px ${mastery[cat] > 80 ? 'var(--accent-success)' : 'var(--accent-warning)'}`
+              }} 
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,31 +97,23 @@ export default function StudentDashboard() {
         <section className="workspace-hero" style={{ padding: '60px', gridTemplateColumns: '1fr 450px', alignItems: 'center' }}>
           <div>
             <div className="hero-kicker">Neural Progress Observatory</div>
-            <h1 className="hero-title"><span className="text-gradient">Telemetry &</span><br />Growth Analysis.</h1>
-            <p className="hero-subtitle">Continuous monitoring of symbolic mastery, error entropy, and derivation efficiency across all curriculum nodes.</p>
-            <div style={{ marginTop: '32px', display: 'flex', gap: '12px' }}>
-              <div className="badge badge-easy">LATENCY: 12ms</div>
-              <div className="badge badge-medium">STATUS: NOMINAL</div>
-              <div className="badge badge-hard">SECURITY: RSA-4096</div>
+            <h1 className="hero-title">Level {dashboard.overview.level} <span className="text-gradient">Engineer</span></h1>
+            <p className="hero-subtitle">Symbolic mastery detected across {Object.keys(dashboard.mastery).length} distinct mathematical domains.</p>
+            
+            <div style={{ marginTop: '24px', width: '300px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                <span>XP: {dashboard.overview.xp % 1000} / 1000</span>
+                <span>TOTAL: {dashboard.overview.xp}</span>
+              </div>
+              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', border: '1px solid var(--border-main)' }}>
+                <div style={{ width: `${(dashboard.overview.xp % 1000) / 10}%`, height: '100%', background: 'var(--accent-primary)', borderRadius: '4px', boxShadow: '0 0 15px var(--accent-primary)' }} />
+              </div>
             </div>
           </div>
           
-          <div className="card" style={{ padding: '32px', background: 'rgba(0,0,0,0.3)', position: 'relative', overflow: 'hidden' }}>
-            <div className="hero-kicker" style={{ fontSize: '0.65rem', marginBottom: '24px' }}>Peak Optimization Zone</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>MASTERED</div>
-                <div style={{ fontWeight: 800, marginTop: '4px', fontSize: '1.1rem' }}>Laplace Domain</div>
-              </div>
-              <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>AVG SCORE</div>
-                <div style={{ fontWeight: 800, marginTop: '4px', fontSize: '1.25rem', color: 'var(--accent-primary)' }}>{dashboard.overview.avg_score}</div>
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>SYSTEM QUASH RANK</div>
-                <div className="badge badge-solved" style={{ marginTop: '12px', width: '100%', textAlign: 'center' }}>ELITE DATA SCIENTIST</div>
-              </div>
-            </div>
+          <div className="card" style={{ padding: '32px', background: 'rgba(5, 8, 17, 0.6)', border: '1px solid var(--accent-primary)', position: 'relative' }}>
+             <h3 style={{ fontSize: '0.85rem', marginBottom: '20px', color: 'var(--accent-primary)', fontWeight: 800 }}>CONCEPTUAL HEATMAP</h3>
+             <MasteryHeatmap mastery={dashboard.mastery} />
           </div>
         </section>
 
@@ -102,46 +131,42 @@ export default function StudentDashboard() {
             <div className="stat-label">Global Accuracy</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">INSTANT</div>
-            <div className="stat-label">Engine Latency</div>
+            <div className="stat-value">{dashboard.overview.avg_score}%</div>
+            <div className="stat-label">Avg Stability</div>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '40px' }}>
           <main>
             <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-              <div style={{ padding: '32px 40px', borderBottom: '1px solid var(--border-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="card-title" style={{ margin: 0 }}>Digital Performance Ledger</h3>
-                <div className="badge badge-easy" style={{ fontSize: '0.6rem' }}>SYNCHRONIZED</div>
+              <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                <h3 style={{ fontSize: '0.9rem', margin: 0 }}>Digital Performance Ledger</h3>
+                <div className="badge badge-easy" style={{ fontSize: '0.55rem' }}>SYNCHRONIZED</div>
               </div>
-              <div style={{ padding: '32px 40px' }}>
+              <div style={{ padding: '0' }}>
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '40%' }}>Question Node</th>
-                      <th>Throughput</th>
+                      <th style={{ paddingLeft: '32px' }}>Question Node</th>
+                      <th>Attempts</th>
                       <th>Peak Score</th>
-                      <th>Status State</th>
-                      <th style={{ textAlign: 'right' }}>Instruction</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right', paddingRight: '32px' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dashboard.question_stats.map((q) => (
-                      <tr key={q.question_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <td style={{ fontWeight: 700, padding: '24px 8px' }}>{q.question_title}</td>
-                        <td style={{ fontFamily: 'JetBrains Mono', color: 'var(--text-secondary)' }}>{q.attempts}</td>
+                      <tr key={q.question_id} className="table-row-hover">
+                        <td style={{ padding: '20px 32px', fontWeight: 700 }}>{q.question_title}</td>
+                        <td style={{ fontFamily: 'JetBrains Mono' }}>{q.attempts}</td>
                         <td style={{ fontWeight: 800, color: 'var(--accent-primary)' }}>{Math.round(q.best_score)}%</td>
                         <td>
                           <div className={`badge ${q.solved ? 'badge-solved' : 'badge-unsolved'}`} style={{ fontSize: '0.6rem' }}>
                             {q.solved ? 'STABLE' : 'UNSTABLE'}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button 
-                            className="btn btn-primary" 
-                            style={{ padding: '8px 20px', fontSize: '0.75rem' }}
-                            onClick={() => navigate(`/solve/${q.question_id}`)}
-                          >
+                        <td style={{ textAlign: 'right', paddingRight: '32px' }}>
+                          <button className="btn btn-primary" style={{ padding: '6px 16px', fontSize: '0.7rem' }} onClick={() => navigate(`/solve/${q.question_id}`)}>
                             {q.solved ? 'RETRY' : 'SOLVE'}
                           </button>
                         </td>
@@ -154,45 +179,26 @@ export default function StudentDashboard() {
           </main>
 
           <aside>
-            <div className="card" style={{ padding: '0', overflow: 'hidden', background: 'rgba(5, 8, 17, 0.4)' }}>
-              <div style={{ padding: '32px 40px', borderBottom: '1px solid var(--border-main)', background: 'rgba(255,255,255,0.02)' }}>
-                <h3 className="card-title" style={{ margin: 0 }}>Recent Transmission Logs</h3>
+            <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+              <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)', background: 'rgba(255,255,255,0.02)' }}>
+                <h3 style={{ fontSize: '0.9rem', margin: 0 }}>Recent Transmissions</h3>
               </div>
-              <div style={{ padding: '32px 40px' }} className="scroll-column">
+              <div style={{ padding: '24px', maxHeight: '600px', overflowY: 'auto' }}>
                 {dashboard.recent_submissions.length === 0 ? (
                   <div style={{ padding: '40px', textAlign: 'center', opacity: 0.3 }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📡</div>
-                    <p style={{ fontSize: '0.85rem' }}>Awaiting data transmission...</p>
+                    <div style={{ fontSize: '2rem' }}>📡</div>
+                    <p>Awaiting logs...</p>
                   </div>
                 ) : (
                   dashboard.recent_submissions.map((s) => (
-                    <div key={s.id} className="stat-card" style={{ padding: '24px', margin: '0 0 20px 0', background: 'rgba(0,0,0,0.5)', borderColor: 'rgba(255,255,255,0.05)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 800, flex: 1, marginRight: '12px' }}>{s.question_title}</div>
-                        <div className={`badge ${s.is_correct ? 'badge-solved' : 'badge-unsolved'}`} style={{ fontSize: '0.6rem', height: 'fit-content' }}>
-                          {s.is_correct ? 'OK' : 'ERR'}
-                        </div>
+                    <div key={s.id} className="stat-card" style={{ padding: '20px', margin: '0 0 16px 0', background: 'rgba(255,255,255,0.01)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800 }}>{s.question_title}</div>
+                        <div style={{ fontWeight: 800, color: s.is_correct ? 'var(--accent-success)' : 'var(--accent-danger)' }}>{Math.round(s.score)}%</div>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 700 }}>{new Date(s.submitted_at).toLocaleDateString()}</div>
-                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: s.is_correct ? 'var(--accent-success)' : 'var(--accent-danger)' }}>{Math.round(s.score)}%</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                        <button 
-                          className="btn btn-outline" 
-                          style={{ flex: 1, padding: '10px', fontSize: '0.7rem', fontWeight: 800 }}
-                          onClick={() => navigate(`/submission-report/${s.id}`)}
-                        >
-                          VIEW LOG
-                        </button>
-                        <button 
-                          className="btn btn-outline" 
-                          style={{ flex: 1, padding: '10px', fontSize: '0.7rem', fontWeight: 800, borderColor: 'var(--accent-danger)', color: 'var(--accent-danger)' }}
-                          onClick={() => handleDeleteSubmission(s.id)}
-                          disabled={deletingId === s.id}
-                        >
-                          {deletingId === s.id ? 'PURGING...' : 'PURGE'}
-                        </button>
+                         <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(s.submitted_at).toLocaleDateString()}</span>
+                         <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.6rem' }} onClick={() => navigate(`/submission-report/${s.id}`)}>VIEW REPORT</button>
                       </div>
                     </div>
                   ))

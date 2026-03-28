@@ -46,12 +46,12 @@ export const getSyllabusMeta = () => request('/questions/meta/syllabus');
 // Validation
 export const validateSteps = (body) => request('/validate', { method: 'POST', body: JSON.stringify(body) });
 export const getHint = (body) => request('/hint', { method: 'POST', body: JSON.stringify(body) });
+export const visionParse = (body) => request('/vision-parse', { method: 'POST', body: JSON.stringify(body) });
 
 // Submissions
 export const getSubmissions = () => request('/submissions');
 export const getSubmission = (id) => request(`/submissions/${id}`);
 export const deleteSubmission = (id) => request(`/submissions/${id}`, { method: 'DELETE' });
-
 // Dashboard
 export const getTeacherDashboard = () => request('/dashboard/teacher');
 export const getStudentDashboard = () => request('/dashboard/student');

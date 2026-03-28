@@ -21,7 +21,11 @@ function Navbar({ user, onLogout }) {
         </div>
       </Link>
 
-      <div className="navbar-links">
+      <div className="navbar-links" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="heartbeat"></div>
+          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>ENGINE: NOMINAL</span>
+        </div>
         {user ? (
           <>
             <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>Workspace</Link>

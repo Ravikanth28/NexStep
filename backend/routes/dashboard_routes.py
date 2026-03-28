@@ -120,15 +120,33 @@ def student_dashboard(
             "submitted_at": str(s.submitted_at)
         })
 
+    # Category Mastery Logic
+    categories = {}
+    for s in submissions:
+        topic = s.question.topic if s.question else "General"
+        if topic not in categories:
+            categories[topic] = {"total": 0, "correct": 0}
+        categories[topic]["total"] += 1
+        if s.is_correct:
+            categories[topic]["correct"] += 1
+            
+    mastery = {
+        topic: round((stats["correct"] / stats["total"]) * 100, 1)
+        for topic, stats in categories.items()
+    }
+
     return {
         "overview": {
             "total_submissions": total,
             "correct_submissions": correct,
             "accuracy": round((correct / total) * 100, 1) if total > 0 else 0,
-            "avg_score": round(avg_score, 1)
+            "avg_score": round(avg_score, 1),
+            "xp": current_user.xp,
+            "level": current_user.level
         },
         "question_stats": list(question_stats.values()),
-        "recent_submissions": recent
+        "recent_submissions": recent,
+        "mastery": mastery
     }
 
 

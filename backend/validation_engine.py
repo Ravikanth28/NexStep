@@ -4,6 +4,9 @@ SymPy-based step validation engine for integral calculus and related topics.
 import ast
 import re
 
+from sympy.abc import x, y, z, t, n
+from ai_engine import expert_critic_check
+
 from sympy import (
     E,
     Matrix,
@@ -142,6 +145,33 @@ def preprocess_text(text: str) -> str:
     text = re.sub(r"(\d+)!", r"factorial(\1)", text)
     text = text.replace("^", "**")
     return text.strip()
+
+
+def detect_mathematical_traps(steps: list[str]) -> list[str]:
+    """Expert rule-based detection for 10-year veteran level 'gotchas'."""
+    traps = []
+    for step in steps:
+        s = step.lower().replace(" ", "")
+        
+        # Power rule applied to exponential base
+        if "d/dx(2**x)" in s or "diff(2**x,x)" in s:
+             if "**(x-1)" in s:
+                traps.append("Expert Alert: Applied standard Power Rule to an exponential base (2^x). Exponential derivatives preserve the base and require a natural log: (a^x)' = a^x * ln(a).")
+        
+        # Integral of 1/x missing absolute value
+        if "integrate(1/x,x)" in s or "log(x)" in s:
+            if "log(abs(x))" not in s and "log(x)" in s:
+                traps.append("Expert Alert: Integral of 1/x is ln|x| + C. Missing the absolute value is a common error that restricts the function to the positive domain.")
+            
+        # Linear property of trig (Universal Error)
+        if "sin(x+y)" in s and "sin(x)+sin(y)" in s:
+             traps.append("Critical Error: Trigonometric functions are NOT linear. sin(A+B) ≠ sin(A) + sin(B). Use sine addition theorem.")
+                 
+        # Missing C in final answer
+        if "y=" in s and "integrate" in s and "+c" not in s:
+            traps.append("Notation Alert: Missing constant of integration (+C). 10-year experts are strict on this as it defines a family of curves, not a single one.")
+            
+    return traps
 
 
 def _find_matching_bracket(text: str, start: int, open_char: str = "[", close_char: str = "]") -> int:
@@ -1971,55 +2001,84 @@ def validate_general_steps(steps: list[str], problem_expr_str: str) -> dict:
     }
 
 
-def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
-    """Dispatch validation based on problem type."""
+async def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
+    """Dispatch validation based on problem type with Expert In-the-Loop."""
     resolved_type = problem_type or infer_problem_type(problem_expr_str)
 
     # L-notation (L[...], L^-1[...]) always indicates a transform problem
     if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str or "") or re.search(r"(?<![A-Za-z])L\s*\^", problem_expr_str or ""):
         resolved_type = "transform"
 
-    if problem_type == "matrix":
-        return validate_matrix_steps(steps, problem_expr_str)
+    # Step 1: Symbolic Check
     if resolved_type == "matrix":
-        return validate_matrix_steps(steps, problem_expr_str)
-    if resolved_type == "series":
-        return validate_fourier_series_steps(steps, problem_expr_str)
-    if resolved_type == "transform":
-        return validate_laplace_family_steps(steps, problem_expr_str)
-    if resolved_type == "stats":
-        return validate_probability_stats_steps(steps, problem_expr_str)
-    if resolved_type in ["vector", "multivariable"]:
-        return validate_vector_multivariable_steps(steps, problem_expr_str)
-    if resolved_type == "ode":
-        return validate_ode_steps(steps, problem_expr_str)
-    if resolved_type == "integral":
-        return validate_integral_steps(steps, problem_expr_str)
-    return validate_general_steps(steps, problem_expr_str)
+        result = validate_matrix_steps(steps, problem_expr_str)
+    elif resolved_type == "series":
+        result = validate_fourier_series_steps(steps, problem_expr_str)
+    elif resolved_type == "transform":
+        result = validate_laplace_family_steps(steps, problem_expr_str)
+    elif resolved_type == "stats":
+        result = validate_probability_stats_steps(steps, problem_expr_str)
+    elif resolved_type in ["vector", "multivariable"]:
+        result = validate_vector_multivariable_steps(steps, problem_expr_str)
+    elif resolved_type == "ode":
+        result = validate_ode_steps(steps, problem_expr_str)
+    elif resolved_type == "integral":
+        result = validate_integral_steps(steps, problem_expr_str)
+    else:
+        result = validate_general_steps(steps, problem_expr_str)
+
+    # Step 2: Expert "Common Trap" Check
+    traps = detect_mathematical_traps(steps)
+    if traps:
+        result["expert_traps"] = traps
+        if result["verdict"] == "Correct":
+            result["verdict"] = "Heuristic"  # Correct expression but sloppy logic/notation
+
+    # Step 3: Neural Expert "10yr Exp" Logic Check
+    # We only run this on complex derivations to save bandwidth
+    if len(steps) >= 3 or result["verdict"] == "Correct":
+        neural_critique = await expert_critic_check(problem_expr_str, steps)
+        result["expert_analysis"] = neural_critique
+        
+        # If the Expert AI finds a fundamental flaw, downgrade the verdict
+        if neural_critique.get("expert_verdict") == "Flawed" and result["verdict"] == "Correct":
+            result["verdict"] = "Incorrect"
+            result["error"] = "Expert Logic Check Failed: " + neural_critique.get("sophisticated_feedback", "")
+
+    return result
 
 
 def build_learning_feedback(validation_result: dict, topic: str = "", strategy: str = "") -> dict:
-    """Convert raw validation output into student-friendly coaching."""
+    """Convert raw validation output into student-friendly coaching with Expert insights."""
     steps = validation_result.get("steps", [])
     strengths = [f"Line {step['step']}: {step['error']}" for step in steps if step.get("valid") and step.get("error")]
     clean_correct = [f"Line {step['step']} is correct." for step in steps if step.get("valid") and not step.get("error")]
     mistakes = [f"Line {step['step']}: {step['error']}" for step in steps if not step.get("valid") and step.get("error")]
 
+    expert_analysis = validation_result.get("expert_analysis", {})
+    traps = validation_result.get("expert_traps", [])
+
     strengths = (strengths + clean_correct)[:4]
-    mistakes = mistakes[:4]
+    
+    # Add expert traps to mistakes
+    mistakes = (traps + mistakes)[:4]
 
     next_step = None
     if mistakes:
         next_step = mistakes[0]
+    elif expert_analysis.get("expert_verdict") == "Heuristic":
+        next_step = "Your result is correct, but an expert would suggest more rigorous notation."
     elif strategy == "series" or "fourier" in (topic or "").lower():
         next_step = "Now check whether you justified symmetry, coefficients, and the final series clearly."
     else:
         next_step = "Your steps are on the right track. Try to keep each transformation mathematically explicit."
 
     if validation_result.get("verdict") == "Correct":
-        summary = "All checked steps are valid."
+        summary = "Analytical verification complete. Rigorous solution found."
+    elif validation_result.get("verdict") == "Heuristic":
+        summary = "Correct result with informal logic. Focus on rigorous notation."
     elif validation_result.get("verdict") in {"Incorrect", "Needs Review", "Review Required"}:
-        summary = "Some steps need correction or teacher review before the solution is complete."
+        summary = "The expert engine detected logical inconsistencies or notation errors."
     else:
         summary = "Validation finished with limited confidence."
 
@@ -2028,6 +2087,8 @@ def build_learning_feedback(validation_result: dict, topic: str = "", strategy: 
         "strengths": strengths,
         "mistakes": mistakes,
         "next_step": next_step,
+        "expert_insight": expert_analysis.get("sophisticated_feedback"),
+        "mastery_rating": expert_analysis.get("mastery_rating", 0)
     }
 
 

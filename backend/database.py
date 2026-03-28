@@ -56,6 +56,20 @@ def ensure_schema():
             text("ALTER TABLE questions ADD COLUMN analysis_confidence DOUBLE PRECISION NOT NULL DEFAULT 0")
         )
 
+    # User table updates
+    if inspector.has_table("users"):
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        if "xp" not in user_columns:
+            statements.append(text("ALTER TABLE users ADD COLUMN xp INTEGER NOT NULL DEFAULT 0"))
+        if "level" not in user_columns:
+            statements.append(text("ALTER TABLE users ADD COLUMN level INTEGER NOT NULL DEFAULT 1"))
+
+    # Submission table updates
+    if inspector.has_table("submissions"):
+        sub_columns = {column["name"] for column in inspector.get_columns("submissions")}
+        if "time_taken" not in sub_columns:
+            statements.append(text("ALTER TABLE submissions ADD COLUMN time_taken INTEGER NOT NULL DEFAULT 0"))
+
     if not statements:
         return
 

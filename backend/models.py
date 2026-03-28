@@ -12,6 +12,8 @@ class User(Base):
     email = Column(String(100), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="student")  # "student" or "teacher"
+    xp = Column(Integer, default=0)
+    level = Column(Integer, default=1)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     questions = relationship("Question", back_populates="creator")
@@ -50,6 +52,7 @@ class Submission(Base):
     steps_json = Column(Text, nullable=False)  # JSON array of step strings
     is_correct = Column(Boolean, default=False)
     score = Column(Float, default=0.0)
+    time_taken = Column(Integer, default=0) # in seconds
     submitted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="submissions")

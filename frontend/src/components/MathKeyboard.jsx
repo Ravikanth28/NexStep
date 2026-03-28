@@ -112,26 +112,53 @@ export default function MathKeyboard({ onInsert }) {
         <h3 style={{ fontSize: '1rem', margin: 0 }}>Fast Symbolic Tools</h3>
       </div>
 
-      <div className="keyboard-tabs">
+      <div className="keyboard-tabs" style={{ padding: '8px 24px', background: 'rgba(255,255,255,0.01)', borderBottom: '1px solid var(--border-main)', display: 'flex', gap: '8px', overflowX: 'auto' }}>
         {TABS.map((tab) => (
           <button
             key={tab}
             className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
+            onClick={(e) => { e.preventDefault(); setActiveTab(tab); }}
             type="button"
+            style={{ 
+              background: activeTab === tab ? 'var(--accent-primary)' : 'transparent',
+              color: activeTab === tab ? 'var(--bg-darker)' : 'var(--text-secondary)',
+              border: 'none',
+              padding: '6px 16px',
+              borderRadius: '99px',
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
           >
-            {tab}
+            {tab.toUpperCase()}
           </button>
         ))}
       </div>
 
-      <div className="keyboard-keys" style={{ padding: '16px' }}>
+      <div className="keyboard-keys" style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
         {SYMBOLS[activeTab].map((sym, idx) => (
           <button
             key={idx}
             className="key-btn"
-            onClick={() => onInsert(sym.insert, sym.selectStart, sym.selectEnd)}
+            onClick={(e) => { e.preventDefault(); onInsert(sym.insert, sym.selectStart, sym.selectEnd); }}
             type="button"
+            style={{ 
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid var(--border-main)',
+              borderRadius: '8px',
+              padding: '10px 4px',
+              color: 'white',
+              fontSize: '0.85rem',
+              fontFamily: 'JetBrains Mono',
+              cursor: 'pointer',
+              transition: 'all 0.1s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '60px'
+            }}
             title={sym.label}
           >
             {sym.label}

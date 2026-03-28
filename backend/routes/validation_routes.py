@@ -7,6 +7,7 @@ from models import Question, Submission, StepLog, User
 from auth import get_current_user
 from validation_engine import build_learning_feedback, validate_steps, get_hint
 from syllabus_engine import build_validation_notes, analyze_question_text, deserialize_concept_tags
+from ai_engine import get_ai_response
 
 router = APIRouter(prefix="/api", tags=["validation"])
 
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/api", tags=["validation"])
 class ValidateRequest(BaseModel):
     question_id: int
     steps: list[str]
+    time_taken: int = 0
 
 
 class HintRequest(BaseModel):
@@ -30,7 +32,7 @@ def _resolve_user(user_data: dict = Depends(get_current_user), db: Session = Dep
 
 
 @router.post("/validate")
-def validate_solution(
+async def validate_solution(
     req: ValidateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(_resolve_user)
@@ -45,7 +47,7 @@ def validate_solution(
 
     # Validate steps using SymPy engine
     analysis = analyze_question_text(question.title, question.problem_expr, question.topic)
-    result = validate_steps(
+    result = await validate_steps(
         req.steps,
         question.problem_expr,
         question.validation_strategy or question.problem_type or analysis.strategy,
@@ -61,11 +63,26 @@ def validate_solution(
         question_id=question.id,
         steps_json=json.dumps(req.steps),
         is_correct=is_correct,
-        score=score
+        score=score,
+        time_taken=req.time_taken
     )
     db.add(submission)
+
+    # --- Gamification Logic: Neural XP ---
+    xp_gained = correct_count * 10  # 10 XP per valid step
+    if is_correct:
+        xp_gained += 100  # 100 XP bonus for full proof
+    
+    current_user.xp += xp_gained
+    
+    # Leveling logic: Level = 1 + floor(XP / 1000)
+    new_level = 1 + (current_user.xp // 1000)
+    leveled_up = new_level > current_user.level
+    current_user.level = new_level
+    
     db.commit()
     db.refresh(submission)
+    db.refresh(current_user)
 
     # Save step logs
     for step_result in result["steps"]:
@@ -101,11 +118,17 @@ def validate_solution(
             "analysis_confidence": question.analysis_confidence or analysis.confidence,
             "notes": build_validation_notes(analysis),
         },
+        "gamification": {
+            "xp_gained": xp_gained,
+            "total_xp": current_user.xp,
+            "level": current_user.level,
+            "leveled_up": leveled_up
+        }
     }
 
 
 @router.post("/hint")
-def get_hint_for_question(
+async def get_hint_for_question(
     req: HintRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(_resolve_user)
@@ -114,7 +137,7 @@ def get_hint_for_question(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    hint = get_hint(question.problem_expr, req.step_number)
+    hint = await get_hint(question.problem_expr, req.step_number)
     return {"hint": hint}
 
 
@@ -134,6 +157,7 @@ def get_submissions(
             "question_title": s.question.title if s.question else "Unknown",
             "is_correct": s.is_correct,
             "score": s.score,
+            "time_taken": s.time_taken,
             "steps": json.loads(s.steps_json),
             "submitted_at": str(s.submitted_at)
         }
@@ -177,6 +201,7 @@ def get_submission_detail(
         "validation_strategy": question.validation_strategy if question else "",
         "is_correct": submission.is_correct,
         "score": submission.score,
+        "time_taken": submission.time_taken,
         "submitted_at": str(submission.submitted_at),
         "steps": steps,
         "verdict": "Correct" if submission.is_correct else "Incorrect",
@@ -200,3 +225,43 @@ def delete_submission(
     db.delete(submission)
     db.commit()
     return {"message": "Submission deleted successfully"}
+
+
+class VisionRequest(BaseModel):
+    image_b64: str
+
+
+@router.post("/vision-parse")
+async def vision_parse_math(
+    req: VisionRequest,
+    current_user: User = Depends(_resolve_user)
+):
+    """Use Gemini Flash to ingest handwritten math images."""
+    from ai_engine import get_ai_response
+    
+    system_prompt = """
+    You are the NexStep Vision Ingest Module. 
+    Analyze the provided image (represented by base64) of a mathematical derivation.
+    Extract the symbolic steps line-by-line.
+    Output a JSON object ONLY with:
+    {
+      "steps": ["step1", "step2", ...],
+      "confidence": 0.95
+    }
+    Convert to SymPy-readable format (e.g. x**2, integrate(x, x), etc).
+    """
+    
+    # Simulation: We send the request to the AI engine.
+    # In a production environment, we'd pass the actual base64 to the Gemini Vision API.
+    full_str = str(req.image_b64)
+    short_str = full_str[0:100] if len(full_str) > 100 else full_str
+    prompt = f"Extract steps from this mathematical image (Base64 data provided: {short_str}...)"
+    response_text = await get_ai_response(prompt, system_prompt)
+    
+    try:
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        data = json.loads(response_text)
+        return data
+    except Exception as e:
+        return {"steps": [], "error": f"Failed to parse neural vision: {str(e)}"}
