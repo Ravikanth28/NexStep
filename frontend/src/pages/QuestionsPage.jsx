@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getQuestions } from '../api';
+import { getQuestions, getQuestionAnswer } from '../api';
 
 const SYLLABUS_TOPICS = [
   'All',
@@ -26,7 +26,11 @@ export default function QuestionsPage() {
   const [topic, setTopic] = useState('All');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [revealedAnswers, setRevealedAnswers] = useState({});
+  const [loadingAnswer, setLoadingAnswer] = useState(null);
   const navigate = useNavigate();
+
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
 
   useEffect(() => {
     loadQuestions();
@@ -41,6 +45,23 @@ export default function QuestionsPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRevealAnswer = async (e, questionId) => {
+    e.stopPropagation();
+    if (revealedAnswers[questionId]) {
+      setRevealedAnswers(prev => { const next = { ...prev }; delete next[questionId]; return next; });
+      return;
+    }
+    setLoadingAnswer(questionId);
+    try {
+      const data = await getQuestionAnswer(questionId);
+      setRevealedAnswers(prev => ({ ...prev, [questionId]: data.correct_answer || 'Unable to compute for this problem type.' }));
+    } catch (err) {
+      setRevealedAnswers(prev => ({ ...prev, [questionId]: 'Error: ' + err.message }));
+    } finally {
+      setLoadingAnswer(null);
     }
   };
 
@@ -190,6 +211,33 @@ export default function QuestionsPage() {
                         <div className="soft-pill">{question.unit_name}</div>
                         <div className="soft-pill" style={{ color: 'var(--accent-primary)' }}>{Math.round((question.analysis_confidence || 0) * 100)}% Routed</div>
                       </div>
+
+                      {user?.role === 'teacher' && (
+                        <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '20px' }}>
+                          <button
+                            className="btn btn-outline"
+                            style={{ fontSize: '0.75rem', padding: '8px 16px', width: '100%', borderColor: revealedAnswers[question.id] ? 'var(--accent-primary)' : undefined }}
+                            onClick={(e) => handleRevealAnswer(e, question.id)}
+                            disabled={loadingAnswer === question.id}
+                          >
+                            {loadingAnswer === question.id ? 'Computing...' : revealedAnswers[question.id] ? 'Hide Answer' : 'Reveal Answer'}
+                          </button>
+                          {revealedAnswers[question.id] && (
+                            <div style={{
+                              marginTop: '10px',
+                              padding: '14px 16px',
+                              background: 'rgba(0, 242, 255, 0.05)',
+                              border: '1px solid var(--accent-primary)',
+                              borderRadius: '8px',
+                            }}>
+                              <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '6px' }}>CORRECT ANSWER</div>
+                              <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', color: 'var(--accent-primary)', wordBreak: 'break-all' }}>
+                                {revealedAnswers[question.id]}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </button>
                 ))}

@@ -4,6 +4,7 @@ import {
   createQuestion,
   deleteQuestion,
   downloadTeacherReport,
+  getQuestionAnswer,
   getQuestions,
   getSyllabusMeta,
   getTeacherDashboard,
@@ -34,6 +35,8 @@ export default function TeacherDashboard() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [revealedAnswers, setRevealedAnswers] = useState({});
+  const [loadingAnswer, setLoadingAnswer] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -129,6 +132,22 @@ export default function TeacherDashboard() {
       await loadData();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleRevealAnswer = async (qid) => {
+    if (revealedAnswers[qid]) {
+      setRevealedAnswers(prev => { const next = { ...prev }; delete next[qid]; return next; });
+      return;
+    }
+    setLoadingAnswer(qid);
+    try {
+      const data = await getQuestionAnswer(qid);
+      setRevealedAnswers(prev => ({ ...prev, [qid]: data.correct_answer || 'Unable to compute for this problem type.' }));
+    } catch (err) {
+      setRevealedAnswers(prev => ({ ...prev, [qid]: 'Error: ' + err.message }));
+    } finally {
+      setLoadingAnswer(null);
     }
   };
 
@@ -389,9 +408,45 @@ export default function TeacherDashboard() {
                       <div className={`badge badge-${question.difficulty}`}>{question.difficulty}</div>
                     </div>
                     <div className="problem">{question.problem_expr}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px', borderTop: '1px solid var(--border-main)', paddingTop: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', gap: '12px', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-outline"
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: '0.8rem',
+                          flex: 1,
+                          borderColor: revealedAnswers[question.id] ? 'var(--accent-primary)' : undefined,
+                          color: revealedAnswers[question.id] ? 'var(--accent-primary)' : undefined,
+                        }}
+                        onClick={() => handleRevealAnswer(question.id)}
+                        disabled={loadingAnswer === question.id}
+                      >
+                        {loadingAnswer === question.id ? 'Computing…' : revealedAnswers[question.id] ? 'Hide Answer' : 'Reveal Answer'}
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        style={{ padding: '8px 16px', fontSize: '0.8rem', borderColor: 'var(--accent-danger)', color: 'var(--accent-danger)' }}
+                        onClick={() => handleDelete(question.id)}
+                      >
+                        Purge
+                      </button>
+                    </div>
+                    {revealedAnswers[question.id] && (
+                      <div style={{
+                        marginTop: '14px',
+                        padding: '14px 16px',
+                        background: 'rgba(0, 242, 255, 0.05)',
+                        border: '1px solid var(--accent-primary)',
+                        borderRadius: '8px',
+                      }}>
+                        <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '0.08em', marginBottom: '6px' }}>CORRECT ANSWER</div>
+                        <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.9rem', color: 'var(--accent-primary)', wordBreak: 'break-all', lineHeight: 1.6 }}>
+                          {revealedAnswers[question.id]}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-main)' }}>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: #{question.id}</div>
-                      <button className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.8rem', borderColor: 'var(--accent-danger)', color: 'var(--accent-danger)' }} onClick={() => handleDelete(question.id)}>Purge</button>
                     </div>
                   </div>
                 ))}

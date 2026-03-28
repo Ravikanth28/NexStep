@@ -69,6 +69,7 @@ export default function SubmissionReportPage() {
   if (!report) return null;
 
   const validSteps = report.steps.filter(s => s.valid).length;
+  const invalidSteps = report.steps.filter(s => !s.valid);
 
   return (
     <div className="page" style={{ padding: '0 0 60px 0' }}>
@@ -140,16 +141,72 @@ export default function SubmissionReportPage() {
             </div>
           </main>
 
-          <aside>
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+            {/* ── Correct Answer Panel ── */}
+            {report.correct_answer && (
+              <div className="card" style={{ padding: '32px', borderColor: 'var(--accent-primary)' }}>
+                <div className="hero-kicker" style={{ fontSize: '0.65rem' }}>Engine Computed</div>
+                <h3 style={{ fontSize: '1rem', marginBottom: '16px' }}>Correct Answer</h3>
+                <div style={{
+                  fontFamily: 'JetBrains Mono',
+                  fontSize: '1.05rem',
+                  padding: '20px',
+                  background: 'rgba(0, 242, 255, 0.05)',
+                  border: '1px solid var(--accent-primary)',
+                  borderRadius: '8px',
+                  color: 'var(--accent-primary)',
+                  wordBreak: 'break-all',
+                  lineHeight: 1.7,
+                }}>
+                  {report.correct_answer}
+                </div>
+                {!report.is_correct && (
+                  <div style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Compare your final step against this result to find where the derivation diverged.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Failed Steps Summary ── */}
+            {invalidSteps.length > 0 && (
+              <div className="card" style={{ padding: '32px', borderColor: 'var(--accent-danger)' }}>
+                <div className="hero-kicker" style={{ fontSize: '0.65rem', color: 'var(--accent-danger)' }}>Error Trace</div>
+                <h3 style={{ fontSize: '1rem', marginBottom: '16px' }}>
+                  {invalidSteps.length} Step{invalidSteps.length > 1 ? 's' : ''} Failed
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {invalidSteps.map(s => (
+                    <div key={s.step} style={{
+                      padding: '12px 16px',
+                      background: 'rgba(255, 50, 50, 0.06)',
+                      borderLeft: '3px solid var(--accent-danger)',
+                      borderRadius: '4px',
+                    }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--accent-danger)', marginBottom: '4px' }}>
+                        LINE {s.step}
+                      </div>
+                      <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>
+                        {s.expression}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{s.error}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Guidance ── */}
             <div className="card" style={{ padding: '32px' }}>
               <div className="hero-kicker" style={{ fontSize: '0.65rem' }}>Next Phase Guidance</div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>AI Recommended Path</h3>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>Recommended Path</h3>
               <div className="analysis-note-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   Re-initialize the solving engine to correct lines marked with <span style={{ color: 'var(--accent-danger)' }}>INVALID</span> status.
                 </div>
                 <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Ensure all symbolic constants are declared using standard Sympy notation for better parsing confidence.
+                  Ensure all symbolic constants are declared using standard SymPy notation for better parsing confidence.
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '32px' }}>
@@ -161,6 +218,7 @@ export default function SubmissionReportPage() {
                 </button>
               </div>
             </div>
+
           </aside>
         </div>
       </div>

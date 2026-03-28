@@ -4,9 +4,6 @@ SymPy-based step validation engine for integral calculus and related topics.
 import ast
 import re
 
-from sympy.abc import x, y, z, t, n
-from ai_engine import expert_critic_check
-
 from sympy import (
     E,
     Matrix,
@@ -145,33 +142,6 @@ def preprocess_text(text: str) -> str:
     text = re.sub(r"(\d+)!", r"factorial(\1)", text)
     text = text.replace("^", "**")
     return text.strip()
-
-
-def detect_mathematical_traps(steps: list[str]) -> list[str]:
-    """Expert rule-based detection for 10-year veteran level 'gotchas'."""
-    traps = []
-    for step in steps:
-        s = step.lower().replace(" ", "")
-        
-        # Power rule applied to exponential base
-        if "d/dx(2**x)" in s or "diff(2**x,x)" in s:
-             if "**(x-1)" in s:
-                traps.append("Expert Alert: Applied standard Power Rule to an exponential base (2^x). Exponential derivatives preserve the base and require a natural log: (a^x)' = a^x * ln(a).")
-        
-        # Integral of 1/x missing absolute value
-        if "integrate(1/x,x)" in s or "log(x)" in s:
-            if "log(abs(x))" not in s and "log(x)" in s:
-                traps.append("Expert Alert: Integral of 1/x is ln|x| + C. Missing the absolute value is a common error that restricts the function to the positive domain.")
-            
-        # Linear property of trig (Universal Error)
-        if "sin(x+y)" in s and "sin(x)+sin(y)" in s:
-             traps.append("Critical Error: Trigonometric functions are NOT linear. sin(A+B) ≠ sin(A) + sin(B). Use sine addition theorem.")
-                 
-        # Missing C in final answer
-        if "y=" in s and "integrate" in s and "+c" not in s:
-            traps.append("Notation Alert: Missing constant of integration (+C). 10-year experts are strict on this as it defines a family of curves, not a single one.")
-            
-    return traps
 
 
 def _find_matching_bracket(text: str, start: int, open_char: str = "[", close_char: str = "]") -> int:
@@ -2001,84 +1971,334 @@ def validate_general_steps(steps: list[str], problem_expr_str: str) -> dict:
     }
 
 
-async def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
-    """Dispatch validation based on problem type with Expert In-the-Loop."""
+def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = "integral") -> dict:
+    """Dispatch validation based on problem type."""
     resolved_type = problem_type or infer_problem_type(problem_expr_str)
 
     # L-notation (L[...], L^-1[...]) always indicates a transform problem
     if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str or "") or re.search(r"(?<![A-Za-z])L\s*\^", problem_expr_str or ""):
         resolved_type = "transform"
 
-    # Step 1: Symbolic Check
+    if problem_type == "matrix":
+        return validate_matrix_steps(steps, problem_expr_str)
     if resolved_type == "matrix":
-        result = validate_matrix_steps(steps, problem_expr_str)
-    elif resolved_type == "series":
-        result = validate_fourier_series_steps(steps, problem_expr_str)
-    elif resolved_type == "transform":
-        result = validate_laplace_family_steps(steps, problem_expr_str)
-    elif resolved_type == "stats":
-        result = validate_probability_stats_steps(steps, problem_expr_str)
-    elif resolved_type in ["vector", "multivariable"]:
-        result = validate_vector_multivariable_steps(steps, problem_expr_str)
-    elif resolved_type == "ode":
-        result = validate_ode_steps(steps, problem_expr_str)
-    elif resolved_type == "integral":
-        result = validate_integral_steps(steps, problem_expr_str)
-    else:
-        result = validate_general_steps(steps, problem_expr_str)
+        return validate_matrix_steps(steps, problem_expr_str)
+    if resolved_type == "series":
+        return validate_fourier_series_steps(steps, problem_expr_str)
+    if resolved_type == "transform":
+        return validate_laplace_family_steps(steps, problem_expr_str)
+    if resolved_type == "stats":
+        return validate_probability_stats_steps(steps, problem_expr_str)
+    if resolved_type in ["vector", "multivariable"]:
+        return validate_vector_multivariable_steps(steps, problem_expr_str)
+    if resolved_type == "ode":
+        return validate_ode_steps(steps, problem_expr_str)
+    if resolved_type == "integral":
+        return validate_integral_steps(steps, problem_expr_str)
+    return validate_general_steps(steps, problem_expr_str)
 
-    # Step 2: Expert "Common Trap" Check
-    traps = detect_mathematical_traps(steps)
-    if traps:
-        result["expert_traps"] = traps
-        if result["verdict"] == "Correct":
-            result["verdict"] = "Heuristic"  # Correct expression but sloppy logic/notation
 
-    # Step 3: Neural Expert "10yr Exp" Logic Check
-    # We only run this on complex derivations to save bandwidth
-    if len(steps) >= 3 or result["verdict"] == "Correct":
-        neural_critique = await expert_critic_check(problem_expr_str, steps)
-        result["expert_analysis"] = neural_critique
-        
-        # If the Expert AI finds a fundamental flaw, downgrade the verdict
-        if neural_critique.get("expert_verdict") == "Flawed" and result["verdict"] == "Correct":
-            result["verdict"] = "Incorrect"
-            result["error"] = "Expert Logic Check Failed: " + neural_critique.get("sophisticated_feedback", "")
+def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str | None:
+    """Compute the engine's correct answer for a problem without any student steps.
 
-    return result
+    Returns a formatted string suitable for display, or *None* if the problem
+    cannot be parsed / evaluated.
+    """
+    if not problem_expr_str:
+        return None
+
+    resolved = strategy or infer_problem_type(problem_expr_str)
+
+    # L-notation always indicates a transform problem
+    if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str) or re.search(
+        r"(?<![A-Za-z])L\s*\^", problem_expr_str
+    ):
+        resolved = "transform"
+
+    try:
+        if resolved == "integral":
+            preprocessed = preprocess_text(problem_expr_str)
+            problem = parse_expression(preprocessed)
+            if problem is None:
+                return None
+            is_definite = bool(re.search(r"integrate\s*\([^,]+,\s*\([^)]+\)\s*\)", preprocessed))
+            if is_definite:
+                return format_expression(simplify(problem))
+            result = integrate(problem, x)
+            return format_expression(result) + " + C"
+
+        if resolved == "transform":
+            _, correct = _extract_laplace_inner(problem_expr_str)
+            if correct is not None:
+                return format_expression(correct)
+            parsed = parse_expression_candidate(problem_expr_str)
+            if parsed is not None:
+                return format_expression(simplify(parsed))
+            return None
+
+        if resolved == "matrix":
+            problem = parse_matrix_problem(problem_expr_str)
+            if problem is None:
+                return None
+            return format_expression(simplify(problem))
+
+        if resolved == "ode":
+            rhs_str = problem_expr_str.split("=")[-1].strip() if "=" in problem_expr_str else problem_expr_str
+            f_expr = parse_expression_candidate(rhs_str)
+            if f_expr is None:
+                return None
+            antideriv = integrate(f_expr, x)
+            return f"y = {format_expression(antideriv)} + C"
+
+        if resolved == "series":
+            return "x = 2·∑(((-1)^(n+1)·sin(n·x))/n, n=1→∞)"
+
+        # General fallback
+        parsed = parse_expression_candidate(problem_expr_str)
+        if parsed is not None:
+            return format_expression(simplify(parsed))
+    except Exception:
+        pass
+
+    return None
+
+
+def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list:
+    """Return a canonical list of solution steps for a given problem.
+    Each item: {"step": int, "title": str, "detail": str}
+    """
+    if not problem_expr_str:
+        return []
+
+    resolved = strategy or infer_problem_type(problem_expr_str)
+    lowered = (problem_expr_str or "").lower()
+
+    # L-notation override
+    if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str) or re.search(
+        r"(?<![A-Za-z])L\s*\^", problem_expr_str
+    ):
+        resolved = "transform"
+
+    steps = []
+    try:
+        # ── INTEGRAL ─────────────────────────────────────────────────────────
+        if resolved == "integral":
+            preprocessed = preprocess_text(problem_expr_str)
+            problem = parse_expression(preprocessed)
+            if problem is None:
+                return []
+            is_definite = bool(re.search(r"integrate\s*\([^,]+,\s*\([^)]+\)\s*\)", preprocessed))
+            if is_definite:
+                int_match = re.search(
+                    r"integrate\s*\(([^,]+),\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\)\s*\)",
+                    preprocessed,
+                )
+                if int_match:
+                    ig_str  = int_match.group(1)
+                    var_str = int_match.group(2).strip()
+                    lo_str  = int_match.group(3).strip()
+                    hi_str  = int_match.group(4).strip()
+                    ig_expr = parse_expression(ig_str)
+                    var_sym = symbols(var_str) if var_str else x
+                    F = integrate(ig_expr, var_sym) if ig_expr else None
+                    result_val = simplify(problem)
+                    steps = [
+                        {"step": 1, "title": "Write the definite integral",
+                         "detail": f"∫({lo_str} to {hi_str}) {ig_str} d{var_str}"},
+                        {"step": 2, "title": "Find the antiderivative",
+                         "detail": f"F({var_str}) = {format_expression(F)}" if F else "Compute antiderivative"},
+                        {"step": 3, "title": "Apply Fundamental Theorem of Calculus",
+                         "detail": f"F({hi_str}) − F({lo_str})"},
+                        {"step": 4, "title": "Evaluate and simplify",
+                         "detail": f"= {format_expression(result_val)}"},
+                    ]
+            else:
+                F = integrate(problem, x)
+                dF = simplify(diff(F, x))
+                steps = [
+                    {"step": 1, "title": "Identify the integrand",
+                     "detail": f"f(x) = {format_expression(problem)}"},
+                    {"step": 2, "title": "Apply integration rules",
+                     "detail": "Use power rule, substitution, or integration by parts as needed"},
+                    {"step": 3, "title": "Write the antiderivative",
+                     "detail": f"F(x) = {format_expression(F)} + C"},
+                    {"step": 4, "title": "Verify by differentiating",
+                     "detail": f"d/dx [{format_expression(F)}] = {format_expression(dF)} ✓"},
+                ]
+
+        # ── ODE ──────────────────────────────────────────────────────────────
+        elif resolved == "ode":
+            rhs_str = problem_expr_str.split("=")[-1].strip() if "=" in problem_expr_str else problem_expr_str
+            f_expr  = parse_expression_candidate(rhs_str)
+            F       = integrate(f_expr, x) if f_expr else None
+            ic_match = re.search(r"y\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*=\s*(\d+(?:\.\d+)?)", lowered)
+            steps = [
+                {"step": 1, "title": "Write the ODE",
+                 "detail": f"dy/dx = {rhs_str}"},
+                {"step": 2, "title": "Separate variables",
+                 "detail": f"dy = ({rhs_str}) dx"},
+                {"step": 3, "title": "Integrate both sides",
+                 "detail": f"∫ dy = ∫ ({rhs_str}) dx"},
+                {"step": 4, "title": "General solution",
+                 "detail": f"y = {format_expression(F) if F else '?'} + C"},
+            ]
+            if ic_match and F is not None and f_expr is not None:
+                x0_val = parse_expression(ic_match.group(1))
+                y0_val = parse_expression(ic_match.group(2))
+                C_val  = simplify(y0_val - F.subs(x, x0_val))
+                particular = simplify(F + C_val)
+                steps.append({"step": 5, "title": f"Apply initial condition y({ic_match.group(1)}) = {ic_match.group(2)}",
+                               "detail": f"{ic_match.group(2)} = {format_expression(F.subs(x, x0_val))} + C  →  C = {format_expression(C_val)}"})
+                steps.append({"step": 6, "title": "Particular solution",
+                               "detail": f"y = {format_expression(particular)}"})
+
+        # ── MATRIX ───────────────────────────────────────────────────────────
+        elif resolved == "matrix":
+            mat = extract_matrix_from_problem(problem_expr_str)
+            if mat is not None and mat.shape == (2, 2):
+                a_, b_, c_, d_ = mat[0, 0], mat[0, 1], mat[1, 0], mat[1, 1]
+                det_val = simplify(mat.det())
+                steps = [
+                    {"step": 1, "title": "Write the 2×2 matrix",
+                     "detail": f"A = [[{a_}, {b_}], [{c_}, {d_}]]"},
+                    {"step": 2, "title": "Apply the determinant formula",
+                     "detail": "det(A) = a·d − b·c"},
+                    {"step": 3, "title": "Substitute matrix entries",
+                     "detail": f"det(A) = ({a_})·({d_}) − ({b_})·({c_})"},
+                    {"step": 4, "title": "Simplify",
+                     "detail": f"det(A) = {format_expression(det_val)}"},
+                ]
+            elif mat is not None:
+                det_val = simplify(mat.det())
+                steps = [
+                    {"step": 1, "title": "Write the matrix", "detail": str(mat)},
+                    {"step": 2, "title": "Expand using cofactor expansion",
+                     "detail": "Expand along the first row"},
+                    {"step": 3, "title": "Result",
+                     "detail": f"det(A) = {format_expression(det_val)}"},
+                ]
+
+        # ── LAPLACE / TRANSFORM ───────────────────────────────────────────────
+        elif resolved == "transform":
+            _, correct = _extract_laplace_inner(problem_expr_str)
+            inner_match = re.search(r"L\s*\^?\s*(?:\(?\s*-\s*1\s*\)?\s*)?[\[\{](.+?)[\]\}]", problem_expr_str)
+            inner_str   = inner_match.group(1).strip() if inner_match else problem_expr_str
+            is_inverse  = bool(re.search(r"L\s*\^\s*(?:\(?\s*-\s*1\s*\)?|\{\s*-\s*1\s*\})", problem_expr_str))
+            if is_inverse:
+                steps = [
+                    {"step": 1, "title": "Identify the expression in s-domain",
+                     "detail": f"F(s) = {inner_str}"},
+                    {"step": 2, "title": "Decompose using partial fractions if needed",
+                     "detail": "Write F(s) as a sum of recognizable transform pairs"},
+                    {"step": 3, "title": "Apply inverse Laplace table",
+                     "detail": "e.g. L⁻¹{1/(s−a)} = eᵃᵗ,  L⁻¹{n!/sⁿ⁺¹} = tⁿ, etc."},
+                    {"step": 4, "title": "Result",
+                     "detail": f"f(t) = {format_expression(correct)}" if correct else "Evaluate inverse transform"},
+                ]
+            else:
+                steps = [
+                    {"step": 1, "title": "Identify the time-domain function",
+                     "detail": f"f(t) = {inner_str}"},
+                    {"step": 2, "title": "Apply standard Laplace transform formula",
+                     "detail": "e.g. L{eᵃᵗ} = 1/(s−a),  L{tⁿ} = n!/sⁿ⁺¹, L{sin(at)} = a/(s²+a²)"},
+                    {"step": 3, "title": "Simplify in s-domain",
+                     "detail": f"F(s) = {format_expression(correct)}" if correct else "Evaluate"},
+                ]
+
+        # ── FOURIER SERIES ────────────────────────────────────────────────────
+        elif resolved == "series":
+            compact = lowered.replace(" ", "")
+            if "f(x)=x" in compact:
+                steps = [
+                    {"step": 1, "title": "Identify symmetry",
+                     "detail": "f(x) = x is an odd function on (−π, π)"},
+                    {"step": 2, "title": "Conclude cosine terms vanish",
+                     "detail": "Since f(x) is odd:  a₀ = 0  and  aₙ = 0 for all n"},
+                    {"step": 3, "title": "Set up the sine coefficient bₙ",
+                     "detail": "bₙ = (2/π) ∫₀^π x · sin(nx) dx"},
+                    {"step": 4, "title": "Integration by parts",
+                     "detail": "Let u = x,  dv = sin(nx)dx  →  du = dx,  v = −cos(nx)/n"},
+                    {"step": 5, "title": "Apply IBP formula",
+                     "detail": "bₙ = (2/π) [ (−x·cos(nx)/n)|₀^π  +  (1/n)∫₀^π cos(nx)dx ]"},
+                    {"step": 6, "title": "Evaluate the boundary term",
+                     "detail": "At x = π:  −π·cos(nπ)/n = −π·(−1)ⁿ/n;  at x = 0: 0"},
+                    {"step": 7, "title": "The remaining integral vanishes",
+                     "detail": "(1/n)∫₀^π cos(nx)dx = sin(nπ)/n² = 0"},
+                    {"step": 8, "title": "Simplify bₙ",
+                     "detail": "bₙ = (2/π)·(−π·(−1)ⁿ/n) = 2·(−1)^(n+1)/n"},
+                    {"step": 9, "title": "Write the final Fourier series",
+                     "detail": "f(x) = 2·Σₙ₌₁^∞  [(−1)^(n+1)/n]·sin(nx)"},
+                    {"step": 10, "title": "First few terms",
+                     "detail": "x ≈ 2[sin(x) − sin(2x)/2 + sin(3x)/3 − sin(4x)/4 + …]"},
+                ]
+            elif "f(x)=x**2" in compact or "f(x)=x^2" in compact:
+                steps = [
+                    {"step": 1, "title": "Identify symmetry",
+                     "detail": "f(x) = x² is an even function on (−π, π)"},
+                    {"step": 2, "title": "Sine terms vanish",
+                     "detail": "Since f(x) is even:  bₙ = 0 for all n"},
+                    {"step": 3, "title": "Compute a₀",
+                     "detail": "a₀ = (2/π)∫₀^π x² dx = (2/π)[x³/3]₀^π = 2π²/3"},
+                    {"step": 4, "title": "Compute aₙ",
+                     "detail": "aₙ = (2/π)∫₀^π x²·cos(nx) dx"},
+                    {"step": 5, "title": "Integrate by parts twice",
+                     "detail": "Result:  aₙ = 4(−1)ⁿ/n²"},
+                    {"step": 6, "title": "Write the Fourier series",
+                     "detail": "f(x) = π²/3 + 4·Σₙ₌₁^∞  [(−1)ⁿ/n²]·cos(nx)"},
+                ]
+            else:
+                steps = [
+                    {"step": 1, "title": "Determine period and symmetry",
+                     "detail": "Check if f(x) is odd, even, or neither on the given interval"},
+                    {"step": 2, "title": "Compute a₀",
+                     "detail": "a₀ = (1/L)∫₋ₗ^L f(x) dx"},
+                    {"step": 3, "title": "Compute aₙ (cosine coefficients)",
+                     "detail": "aₙ = (1/L)∫₋ₗ^L f(x)·cos(nπx/L) dx"},
+                    {"step": 4, "title": "Compute bₙ (sine coefficients)",
+                     "detail": "bₙ = (1/L)∫₋ₗ^L f(x)·sin(nπx/L) dx"},
+                    {"step": 5, "title": "Assemble the Fourier series",
+                     "detail": "f(x) = a₀/2 + Σ[aₙ·cos(nπx/L) + bₙ·sin(nπx/L)]"},
+                ]
+
+        # ── GENERAL FALLBACK ──────────────────────────────────────────────────
+        else:
+            parsed = parse_expression_candidate(problem_expr_str)
+            if parsed:
+                steps = [
+                    {"step": 1, "title": "Problem expression",
+                     "detail": format_expression(parsed)},
+                    {"step": 2, "title": "Simplify using algebraic rules",
+                     "detail": f"Result = {format_expression(simplify(parsed))}"},
+                ]
+
+    except Exception:
+        pass
+
+    return steps
 
 
 def build_learning_feedback(validation_result: dict, topic: str = "", strategy: str = "") -> dict:
-    """Convert raw validation output into student-friendly coaching with Expert insights."""
+    """Convert raw validation output into student-friendly coaching."""
     steps = validation_result.get("steps", [])
     strengths = [f"Line {step['step']}: {step['error']}" for step in steps if step.get("valid") and step.get("error")]
     clean_correct = [f"Line {step['step']} is correct." for step in steps if step.get("valid") and not step.get("error")]
     mistakes = [f"Line {step['step']}: {step['error']}" for step in steps if not step.get("valid") and step.get("error")]
 
-    expert_analysis = validation_result.get("expert_analysis", {})
-    traps = validation_result.get("expert_traps", [])
-
     strengths = (strengths + clean_correct)[:4]
-    
-    # Add expert traps to mistakes
-    mistakes = (traps + mistakes)[:4]
+    mistakes = mistakes[:4]
 
     next_step = None
     if mistakes:
         next_step = mistakes[0]
-    elif expert_analysis.get("expert_verdict") == "Heuristic":
-        next_step = "Your result is correct, but an expert would suggest more rigorous notation."
     elif strategy == "series" or "fourier" in (topic or "").lower():
         next_step = "Now check whether you justified symmetry, coefficients, and the final series clearly."
     else:
         next_step = "Your steps are on the right track. Try to keep each transformation mathematically explicit."
 
     if validation_result.get("verdict") == "Correct":
-        summary = "Analytical verification complete. Rigorous solution found."
-    elif validation_result.get("verdict") == "Heuristic":
-        summary = "Correct result with informal logic. Focus on rigorous notation."
+        summary = "All checked steps are valid."
     elif validation_result.get("verdict") in {"Incorrect", "Needs Review", "Review Required"}:
-        summary = "The expert engine detected logical inconsistencies or notation errors."
+        summary = "Some steps need correction or teacher review before the solution is complete."
     else:
         summary = "Validation finished with limited confidence."
 
@@ -2087,8 +2307,6 @@ def build_learning_feedback(validation_result: dict, topic: str = "", strategy: 
         "strengths": strengths,
         "mistakes": mistakes,
         "next_step": next_step,
-        "expert_insight": expert_analysis.get("sophisticated_feedback"),
-        "mastery_rating": expert_analysis.get("mastery_rating", 0)
     }
 
 

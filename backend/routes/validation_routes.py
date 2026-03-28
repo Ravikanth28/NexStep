@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from database import get_db
 from models import Question, Submission, StepLog, User
 from auth import get_current_user
-from validation_engine import build_learning_feedback, validate_steps, get_hint
+from validation_engine import build_learning_feedback, validate_steps, get_hint, compute_correct_answer, generate_solution_steps
 from syllabus_engine import build_validation_notes, analyze_question_text, deserialize_concept_tags
 from ai_engine import get_ai_response
 
@@ -47,7 +47,7 @@ async def validate_solution(
 
     # Validate steps using SymPy engine
     analysis = analyze_question_text(question.title, question.problem_expr, question.topic)
-    result = await validate_steps(
+    result = validate_steps(
         req.steps,
         question.problem_expr,
         question.validation_strategy or question.problem_type or analysis.strategy,
@@ -123,7 +123,11 @@ async def validate_solution(
             "total_xp": current_user.xp,
             "level": current_user.level,
             "leveled_up": leveled_up
-        }
+        },
+        "solution_steps": generate_solution_steps(
+            question.problem_expr,
+            question.validation_strategy or question.problem_type or analysis.strategy,
+        ),
     }
 
 
@@ -137,7 +141,7 @@ async def get_hint_for_question(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    hint = await get_hint(question.problem_expr, req.step_number)
+    hint = get_hint(question.problem_expr, req.step_number)
     return {"hint": hint}
 
 
@@ -205,7 +209,10 @@ def get_submission_detail(
         "submitted_at": str(submission.submitted_at),
         "steps": steps,
         "verdict": "Correct" if submission.is_correct else "Incorrect",
-        "correct_answer": None,
+        "correct_answer": compute_correct_answer(
+            question.problem_expr if question else "",
+            question.validation_strategy if question else "",
+        ),
     }
 
 

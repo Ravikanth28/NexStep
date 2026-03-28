@@ -1,0 +1,84 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "expression": "f(-x) = f(x)",
+      "valid": true,
+      "error": "Correct: identifying even symmetry."
+    },
+    {
+      "step": 2,
+      "expression": "a0 = 1/pi * integral(-pi to pi) x^2 dx",
+      "valid": true,
+      "error": "Correct a0 integral setup."
+    },
+    {
+      "step": 3,
+      "expression": "a0 = 2*pi^2/3",
+      "valid": true,
+      "error": "Correct a0 evaluation."
+    },
+    {
+      "step": 4,
+      "expression": "an = 1/pi * integral(-pi to pi) x^2 * cos(n*x) dx",
+      "valid": true,
+      "error": "Correct an integral setup."
+    },
+    {
+      "step": 5,
+      "expression": "Let I = integral x^2 cos(n*x) dx",
+      "valid": true,
+      "error": "Applying boundaries."
+    },
+    {
+      "step": 6,
+      "expression": "u = x^2\ndv = cos(n*x) dx\ndu = 2x dx\nv = sin(n*x)/n",
+      "valid": true,
+      "error": "Integration by parts setup."
+    },
+    {
+      "step": 7,
+      "expression": "I = x^2 * sin(n*x)/n - integral (2x * sin(n*x)/n) dx",
+      "valid": true,
+      "error": "Applying boundaries."
+    },
+    {
+      "step": 8,
+      "expression": "I = x^2 sin(n*x)/n - (2/n) integral x sin(n*x) dx",
+      "valid": true,
+      "error": "Applying boundaries."
+    },
+    {
+      "step": 9,
+      "expression": "u = x\ndv = sin(n*x) dx\n...",
+      "valid": true,
+      "error": "Integration by parts setup."
+    },
+    {
+      "step": 10,
+      "expression": "I = (2\u03c0 (-1)^n)/n^2",
+      "valid": true,
+      "error": "Correct an evaluation."
+    },
+    {
+      "step": 11,
+      "expression": "an = 4(-1)^n / n^2",
+      "valid": true,
+      "error": "Correct an evaluation."
+    },
+    {
+      "step": 12,
+      "expression": "bn = 0",
+      "valid": true,
+      "error": "Correct: bn is 0 for even functions."
+    },
+    {
+      "step": 13,
+      "expression": "f(x) = pi^2/3 + sum(4(-1)^n / n^2 * cos(nx))",
+      "valid": true,
+      "error": "Correct final cosine-series form."
+    }
+  ],
+  "verdict": "Correct",
+  "correct_answer": "x^2 = pi^2/3 + 4*sum(((-1)^n*cos(n*x))/n^2, (n,1,oo))"
+}

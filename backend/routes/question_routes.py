@@ -88,6 +88,26 @@ def analyze_question_payload(req: QuestionCreate):
     }
 
 
+@router.get("/{question_id}/answer")
+def get_question_answer(
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user),
+):
+    """Teacher-only: return the engine-computed correct answer for a question."""
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can view correct answers on question cards")
+
+    q = db.query(Question).filter(Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    from validation_engine import compute_correct_answer
+    strategy = q.validation_strategy or q.problem_type
+    answer = compute_correct_answer(q.problem_expr, strategy)
+    return {"question_id": question_id, "correct_answer": answer, "strategy": strategy}
+
+
 @router.get("/{question_id}")
 def get_question(question_id: int, db: Session = Depends(get_db)):
     q = db.query(Question).filter(Question.id == question_id).first()
