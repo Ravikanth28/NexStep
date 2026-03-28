@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getHint as apiGetHint, getQuestion, validateSteps } from '../api';
 import MathKeyboard from '../components/MathKeyboard';
 
@@ -12,7 +12,6 @@ function formatTime(seconds) {
 export default function SolvePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const [question, setQuestion] = useState(null);
   const [text, setText] = useState('');
   const [results, setResults] = useState(null);
@@ -23,23 +22,25 @@ export default function SolvePage() {
   const [feedback, setFeedback] = useState(null);
   const [submissionId, setSubmissionId] = useState(null);
   const [solutionSteps, setSolutionSteps] = useState([]);
-  const [showSolution, setShowSolution] = useState(false);
+  const [evaluationMode, setEvaluationMode] = useState('');
+  const [overallFeedback, setOverallFeedback] = useState('');
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [hint, setHint] = useState('');
   const [hintLoading, setHintLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState(false);
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
-  useEffect(() => { loadQuestion(); }, [id]);
+  useEffect(() => {
+    loadQuestion();
+  }, [id]);
 
   useEffect(() => {
     let interval;
     if (timerActive) {
-      interval = setInterval(() => setTimer(c => c + 1), 1000);
+      interval = setInterval(() => setTimer((c) => c + 1), 1000);
     }
     return () => clearInterval(interval);
   }, [timerActive]);
@@ -86,8 +87,9 @@ export default function SolvePage() {
   };
 
   const handleValidate = async () => {
-    const steps = text.split('\n').map(line => line.trim()).filter(Boolean);
+    const steps = text.split('\n').map((line) => line.trim()).filter(Boolean);
     if (steps.length === 0) return;
+
     setValidating(true);
     setResults(null);
     setVerdict(null);
@@ -97,8 +99,10 @@ export default function SolvePage() {
     setFeedback(null);
     setSubmissionId(null);
     setSolutionSteps([]);
-    setShowSolution(false);
+    setEvaluationMode('');
+    setOverallFeedback('');
     setTimerActive(false);
+
     try {
       const data = await validateSteps({ question_id: parseInt(id, 10), steps });
       setResults(data.steps || []);
@@ -108,6 +112,8 @@ export default function SolvePage() {
       setFeedback(data.feedback || null);
       setSubmissionId(data.submission_id || null);
       setSolutionSteps(data.solution_steps || []);
+      setEvaluationMode(data.evaluation_mode || '');
+      setOverallFeedback(data.overall_feedback || '');
       if (data.error) setValidationError(data.error);
     } catch (err) {
       console.error(err);
@@ -142,7 +148,8 @@ export default function SolvePage() {
     setHint('');
     setSubmissionId(null);
     setSolutionSteps([]);
-    setShowSolution(false);
+    setEvaluationMode('');
+    setOverallFeedback('');
     setTimer(0);
     setTimerActive(false);
   };
@@ -173,9 +180,11 @@ export default function SolvePage() {
   }
 
   const lines = text.split('\n');
+  const validCount = results ? results.filter((r) => r.valid).length : 0;
+  const invalidCount = results ? results.length - validCount : 0;
 
   return (
-    <div className="page" style={{ padding: '0 0 60px 0' }}>
+    <div className="page solve-screen" style={{ padding: '0 0 60px 0' }}>
       <div className="container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <button className="btn btn-outline" style={{ padding: '10px 20px' }} onClick={() => navigate('/questions')}>
@@ -215,33 +224,47 @@ export default function SolvePage() {
                 <div style={{ fontWeight: 700, marginTop: '4px' }}>{question.validation_strategy || 'Symbolic'}</div>
               </div>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>MODEL CONF</div>
-                <div style={{ fontWeight: 700, marginTop: '4px', color: 'var(--accent-success)' }}>98.2%</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>EVALUATION</div>
+                <div style={{ fontWeight: 700, marginTop: '4px', color: 'var(--accent-success)' }}>{evaluationMode || 'NVIDIA judge'}</div>
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>COACH NOTES</div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: '1.5' }}>
-                  Provide step-by-step symbolic derivation. Each line must be a unique, balanced transformation for optimal validation throughput.
+                  Symbols are docked on the left, your editor is on the right, and the output below compares SymPy reference steps with the AI evaluation.
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <div style={{ display: 'flex', gap: '32px', position: 'relative' }}>
-          <main style={{ flex: 1, minWidth: 0 }}>
-            <div className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '24px 32px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-main)' }}>
-                <h3 style={{ fontSize: '1rem', margin: 0 }}>Symbolic Input [UTF-8]</h3>
+        <div className="solver-top-grid">
+          <section className="solver-panel solver-symbols-panel">
+            <div className="solver-panel-head">
+              <div>
+                <div className="solver-kicker">Notation Center</div>
+                <h3 className="solver-title">Fast Symbolic Tools</h3>
               </div>
-              
-              <div style={{ background: 'var(--bg-darker)', borderBottom: '1px solid var(--border-main)' }}>
+              <div className="solver-head-badge">left dock</div>
+            </div>
+            <div className="solver-panel-body">
+              <div className="solver-keyboard-shell solver-keyboard-shell-standalone">
                 <MathKeyboard onInsert={handleInsertSymbol} />
               </div>
+            </div>
+          </section>
 
-              <div style={{ height: '400px', display: 'flex', overflow: 'hidden', background: '#000' }}>
-                <div style={{ width: '50px', borderRight: '1px solid var(--border-main)', padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'JetBrains Mono', overflowY: 'hidden' }} ref={lineNumbersRef}>
-                  {lines.map((_, i) => <div key={i} style={{ height: '24px', lineHeight: '24px' }}>{i + 1}</div>)}
+          <main className="solver-panel solver-editor-panel">
+            <div className="solver-panel-head">
+              <div>
+                <div className="solver-kicker">Student Workspace</div>
+                <h3 className="solver-title">Editor [UTF-8]</h3>
+              </div>
+              <div className="solver-head-badge">{lines.filter((line) => line.trim()).length} lines</div>
+            </div>
+            <div className="solver-panel-body">
+              <div className="solver-editor-shell solver-editor-shell-tall">
+                <div className="solver-editor-gutter" ref={lineNumbersRef}>
+                  {lines.map((_, i) => <div key={i} className="solver-editor-line">{i + 1}</div>)}
                 </div>
                 <textarea
                   ref={textareaRef}
@@ -249,24 +272,12 @@ export default function SolvePage() {
                   onChange={handleTextChange}
                   onScroll={handleScroll}
                   spellCheck={false}
+                  className="solver-editor"
                   placeholder="Insert symbolic steps here... (e.g. ∫(2x+1)dx)"
-                  style={{ 
-                    flex: 1, 
-                    background: 'transparent', 
-                    border: 'none', 
-                    resize: 'none', 
-                    padding: '20px',
-                    fontFamily: 'JetBrains Mono, monospace',
-                    fontSize: '1.1rem',
-                    lineHeight: '24px',
-                    color: 'var(--accent-primary)',
-                    outline: 'none',
-                    overflowY: 'auto'
-                  }}
                 />
               </div>
 
-              <div style={{ padding: '24px 32px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid var(--border-main)', display: 'flex', gap: '16px' }}>
+              <div className="solver-action-bar">
                 <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={handleValidate} disabled={validating}>
                   {validating ? <div className="spinner"></div> : 'Commit & Validate'}
                 </button>
@@ -277,224 +288,161 @@ export default function SolvePage() {
               </div>
 
               {hint && (
-                <div style={{ padding: '24px 32px', background: 'rgba(0, 242, 255, 0.05)', borderTop: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', fontSize: '0.9rem' }}>
-                  <strong><span style={{ marginRight: '8px' }}>💡</span> AI Suggested Path:</strong> {hint}
+                <div className="solver-hint">
+                  <strong>AI Suggested Path:</strong> {hint}
                 </div>
               )}
             </div>
           </main>
+        </div>
 
-          <aside style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-            <div className="card" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'rgba(5, 8, 17, 0.5)' }}>
-              <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)' }}>
-                <h3 style={{ fontSize: '1rem', margin: 0 }}>Validation Telemetry</h3>
+        <div className="solver-output-grid">
+          <section className="solver-panel">
+            <div className="solver-panel-head">
+              <div>
+                <div className="solver-kicker">Reference Engine</div>
+                <h3 className="solver-title">SymPy Steps</h3>
               </div>
-
-              <div style={{ flex: 1, padding: '32px', overflowY: 'auto', minHeight: 0 }}>
-                {!results && !validationError ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.3 }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '20px' }}>⚙️</div>
-                    <p style={{ textAlign: 'center' }}>Awaiting symbolic commit for<br />line-by-line verification.</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {validationError && (
-                      <div className="badge badge-hard" style={{ width: '100%', padding: '16px', fontSize: '0.9rem' }}>
-                        SYSTEM ERROR: {validationError}
+              <div className="solver-head-badge">{solutionSteps.length || 0} steps</div>
+            </div>
+            <div className="solver-panel-body solver-telemetry-body">
+              {solutionSteps.length === 0 ? (
+                <div className="telemetry-empty">
+                  <div className="telemetry-empty-icon">∑</div>
+                  <p>Awaiting validation to generate the SymPy reference path.</p>
+                </div>
+              ) : (
+                <div className="solution-list solution-list-always-open">
+                  {solutionSteps.map((s) => (
+                    <div key={s.step} className="solution-step">
+                      <div className="solution-step-index">{s.step}</div>
+                      <div style={{ flex: 1 }}>
+                        <div className="solution-step-title">{s.title}</div>
+                        <div className="solution-step-detail">{s.detail}</div>
                       </div>
-                    )}
-                    
-                    {/* ── Verdict ── */}
-                    {verdict && (
-                      <div style={{
-                        padding: '20px 24px',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        background: verdict === 'Correct' ? 'rgba(0, 255, 157, 0.1)' : 'rgba(255, 0, 85, 0.1)',
-                        border: `1px solid ${verdict === 'Correct' ? 'var(--accent-success)' : 'var(--accent-danger)'}`,
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 800, marginBottom: '4px', color: 'var(--text-muted)' }}>VERDICT</div>
-                          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: verdict === 'Correct' ? 'var(--accent-success)' : 'var(--accent-danger)' }}>
-                            {verdict === 'Correct' ? '✓ PROVED' : '✗ FAILED'}
-                          </div>
-                        </div>
-                        {results && (
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800 }}>STEPS</div>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                              <span style={{ color: 'var(--accent-success)' }}>{results.filter(r => r.valid).length}</span>
-                              <span style={{ color: 'var(--text-muted)' }}> / {results.length}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
 
-                    {/* ── Correct Answer Panel ── */}
-                    {correctAnswer && (
-                      <div style={{
-                        padding: '20px 24px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 242, 255, 0.05)',
-                        border: '1px solid var(--accent-primary)',
-                      }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '0.08em', marginBottom: '10px' }}>
-                          ENGINE CORRECT ANSWER
-                        </div>
-                        <div style={{
-                          fontFamily: 'JetBrains Mono',
-                          fontSize: '1rem',
-                          color: 'var(--accent-primary)',
-                          wordBreak: 'break-all',
-                          lineHeight: 1.7,
-                        }}>
-                          {correctAnswer}
-                        </div>
-                        {verdict !== 'Correct' && (
-                          <div style={{ marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                            Compare your final step against this result to find where your derivation went wrong.
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* ── Step-by-Step Results ── */}
-                    {results && results.map((res, i) => (
-                      <div key={i} style={{
-                        padding: '18px 20px',
-                        borderRadius: '8px',
-                        border: `1px solid ${res.valid ? 'var(--accent-success)' : 'var(--accent-danger)'}`,
-                        background: res.valid ? 'rgba(0,255,157,0.03)' : 'rgba(255,0,85,0.05)',
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>LINE {res.step}</div>
-                          <div className={`badge ${res.valid ? 'badge-solved' : 'badge-unsolved'}`} style={{ fontSize: '0.6rem' }}>
-                            {res.valid ? '✓ VALID' : '✗ INVALID'}
-                          </div>
-                        </div>
-                        <div style={{ fontFamily: 'JetBrains Mono', fontSize: '1rem', color: res.valid ? 'white' : 'var(--accent-danger)' }}>
-                          {res.expression}
-                        </div>
-                        {/* Error explanation for wrong steps */}
-                        {!res.valid && res.error && (
-                          <div style={{
-                            marginTop: '10px',
-                            padding: '10px 14px',
-                            background: 'rgba(255,0,85,0.08)',
-                            borderLeft: '3px solid var(--accent-danger)',
-                            borderRadius: '0 4px 4px 0',
-                            fontSize: '0.82rem',
-                            color: 'rgba(255,255,255,0.75)',
-                            lineHeight: 1.5,
-                          }}>
-                            <span style={{ fontWeight: 800, color: 'var(--accent-danger)' }}>Why invalid: </span>{res.error}
-                          </div>
-                        )}
-                        {/* Info note for valid steps that have a message */}
-                        {res.valid && res.error && (
-                          <div style={{ marginTop: '8px', fontSize: '0.78rem', color: 'var(--accent-success)', opacity: 0.75 }}>
-                            ↳ {res.error}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* ── AI Feedback ── */}
-                    {feedback && (
-                      <div style={{ padding: '20px 24px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-main)', borderRadius: '8px' }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '10px' }}>AI LEARNING FEEDBACK</div>
-                        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>{feedback.summary}</p>
-                        {(feedback.mistakes.length > 0) && (
-                          <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {feedback.mistakes.slice(0, 3).map(m => (
-                              <div key={m} style={{ fontSize: '0.78rem', color: 'var(--accent-danger)', padding: '6px 10px', background: 'rgba(255,0,85,0.06)', borderRadius: '4px' }}>✗ {m}</div>
-                            ))}
-                          </div>
-                        )}
-                        {(feedback.strengths.length > 0) && (
-                          <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {feedback.strengths.slice(0, 2).map(s => (
-                              <div key={s} style={{ fontSize: '0.78rem', color: 'var(--accent-success)', padding: '6px 10px', background: 'rgba(0,255,157,0.06)', borderRadius: '4px' }}>✓ {s}</div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* ── Model Solution Panel ── */}
-                    {solutionSteps.length > 0 && (
-                      <div style={{ border: '1px solid var(--accent-secondary)', borderRadius: '8px', overflow: 'hidden' }}>
-                        <button
-                          onClick={() => setShowSolution(v => !v)}
-                          style={{
-                            width: '100%',
-                            padding: '16px 20px',
-                            background: showSolution ? 'rgba(157,78,221,0.15)' : 'rgba(157,78,221,0.07)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '1rem' }}>📖</span>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-secondary)', letterSpacing: '0.06em' }}>MODEL SOLUTION</span>
-                            <span style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(157,78,221,0.2)', borderRadius: '999px', color: 'var(--accent-secondary)' }}>
-                              {solutionSteps.length} steps
-                            </span>
-                          </div>
-                          <span style={{ color: 'var(--accent-secondary)', fontSize: '0.9rem' }}>{showSolution ? '▲ Hide' : '▼ Show'}</span>
-                        </button>
-
-                        {showSolution && (
-                          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.3)' }}>
-                            {solutionSteps.map((s) => (
-                              <div key={s.step} style={{
-                                display: 'flex',
-                                gap: '14px',
-                                padding: '14px 16px',
-                                background: 'rgba(255,255,255,0.03)',
-                                borderRadius: '6px',
-                                borderLeft: '3px solid var(--accent-secondary)',
-                              }}>
-                                <div style={{
-                                  minWidth: '28px',
-                                  height: '28px',
-                                  borderRadius: '50%',
-                                  background: 'rgba(157,78,221,0.25)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 800,
-                                  color: 'var(--accent-secondary)',
-                                  flexShrink: 0,
-                                }}>
-                                  {s.step}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white', marginBottom: '4px' }}>{s.title}</div>
-                                  <div style={{
-                                    fontFamily: 'JetBrains Mono',
-                                    fontSize: '0.82rem',
-                                    color: 'var(--accent-secondary)',
-                                    lineHeight: 1.6,
-                                    wordBreak: 'break-word',
-                                  }}>{s.detail}</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+          <aside className="solver-panel">
+            <div className="solver-panel-head">
+              <div>
+                <div className="solver-kicker">Model Evaluation</div>
+                <h3 className="solver-title">AI Evaluation</h3>
               </div>
+              <div className="solver-head-badge">{evaluationMode || 'awaiting_run'}</div>
+            </div>
+            <div className="solver-panel-body solver-telemetry-body">
+              {!results && !validationError ? (
+                <div className="telemetry-empty">
+                  <div className="telemetry-empty-icon">◌</div>
+                  <p>Awaiting symbolic commit for line-by-line verification.</p>
+                </div>
+              ) : (
+                <div className="telemetry-stack">
+                  <div className="telemetry-strip">
+                    <div className="telemetry-mini">
+                      <div className="telemetry-mini-label">Verdict</div>
+                      <div className={`telemetry-mini-value ${verdict === 'Correct' ? 'is-good' : 'is-bad'}`}>
+                        {verdict || 'Pending'}
+                      </div>
+                    </div>
+                    <div className="telemetry-mini">
+                      <div className="telemetry-mini-label">Valid</div>
+                      <div className="telemetry-mini-value is-good">{validCount}</div>
+                    </div>
+                    <div className="telemetry-mini">
+                      <div className="telemetry-mini-label">Invalid</div>
+                      <div className="telemetry-mini-value is-bad">{invalidCount}</div>
+                    </div>
+                  </div>
+
+                  {validationError && (
+                    <div className="telemetry-error">
+                      SYSTEM ERROR: {validationError}
+                    </div>
+                  )}
+
+                  {overallFeedback && (
+                    <div className="telemetry-card telemetry-card-info">
+                      <div className="telemetry-card-label">Overall Feedback</div>
+                      <div className="telemetry-copy">{overallFeedback}</div>
+                    </div>
+                  )}
+
+                  {correctAnswer && (
+                    <div className="telemetry-card telemetry-card-accent">
+                      <div className="telemetry-card-label">Engine Correct Answer</div>
+                      <div className="telemetry-mono">{correctAnswer}</div>
+                      {verdict !== 'Correct' && (
+                        <div className="telemetry-copy subtle">
+                          Compare your final step against this result to find where your derivation went wrong.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {results && results.map((res, i) => (
+                    <div key={i} className={`telemetry-step ${res.valid ? 'is-valid' : 'is-invalid'}`}>
+                      <div className="telemetry-step-top">
+                        <div className="telemetry-step-line">LINE {res.step}</div>
+                        <div className={`badge ${res.valid ? 'badge-solved' : 'badge-unsolved'}`} style={{ fontSize: '0.6rem' }}>
+                          {res.valid ? 'VALID' : 'INVALID'}
+                        </div>
+                      </div>
+                      <div className="telemetry-step-expression">{res.expression}</div>
+                      {!res.valid && res.error && (
+                        <div className="telemetry-step-note invalid-note">
+                          <span>Why invalid:</span> {res.error}
+                        </div>
+                      )}
+                      {res.valid && res.error && (
+                        <div className="telemetry-step-note valid-note">{res.error}</div>
+                      )}
+                    </div>
+                  ))}
+
+                  {feedback && (
+                    <div className="telemetry-card">
+                      <div className="telemetry-card-label">AI Learning Feedback</div>
+                      <div className="telemetry-copy">{feedback.summary}</div>
+                      {(feedback.mistakes.length > 0) && (
+                        <div className="telemetry-chip-column">
+                          {feedback.mistakes.slice(0, 3).map((m) => (
+                            <div key={m} className="telemetry-chip telemetry-chip-bad">{m}</div>
+                          ))}
+                        </div>
+                      )}
+                      {(feedback.strengths.length > 0) && (
+                        <div className="telemetry-chip-column">
+                          {feedback.strengths.slice(0, 2).map((s) => (
+                            <div key={s} className="telemetry-chip telemetry-chip-good">{s}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {questionAnalysis && (
+                    <div className="telemetry-card">
+                      <div className="telemetry-card-label">Question Analysis</div>
+                      <div className="telemetry-copy">
+                        {questionAnalysis.subject} • {questionAnalysis.topic} • {questionAnalysis.validation_strategy}
+                      </div>
+                    </div>
+                  )}
+
+                  {submissionId && (
+                    <div className="telemetry-card">
+                      <div className="telemetry-card-label">Submission</div>
+                      <div className="telemetry-copy">Saved as #{submissionId}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </aside>
         </div>

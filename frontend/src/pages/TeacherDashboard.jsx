@@ -10,6 +10,21 @@ import {
   getTeacherDashboard,
 } from '../api';
 
+const BUILDER_LIBRARY = [
+  { id: 'task_fourier', label: 'Find the Fourier Series of', value: 'Find the Fourier Series of' },
+  { id: 'task_laplace', label: 'Find the Laplace Transform of', value: 'Find the Laplace Transform of' },
+  { id: 'task_inverse_laplace', label: 'Find the Inverse Laplace Transform of', value: 'Find the Inverse Laplace Transform of' },
+  { id: 'fx', label: 'f(x)=', value: 'f(x)=' },
+  { id: 'expr_x2', label: 'x**2', value: 'x**2' },
+  { id: 'expr_sinx', label: 'sin(x)', value: 'sin(x)' },
+  { id: 'expr_cosx', label: 'cos(x)', value: 'cos(x)' },
+  { id: 'expr_expx', label: 'exp(x)', value: 'exp(x)' },
+  { id: 'interval_pi', label: 'on (-pi, pi)', value: 'on (-pi, pi)' },
+  { id: 'interval_half_pi', label: 'on (0, pi)', value: 'on (0, pi)' },
+  { id: 'note_even', label: 'where f(-x)=f(x)', value: 'where f(-x)=f(x)' },
+  { id: 'note_odd', label: 'where f(-x)=-f(x)', value: 'where f(-x)=-f(x)' },
+];
+
 const DEFAULT_FORM = {
   title: '',
   problem_expr: '',
@@ -37,6 +52,8 @@ export default function TeacherDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [revealedAnswers, setRevealedAnswers] = useState({});
   const [loadingAnswer, setLoadingAnswer] = useState(null);
+  const [builderItems, setBuilderItems] = useState([]);
+  const [customBuilderToken, setCustomBuilderToken] = useState('');
 
   useEffect(() => {
     loadData();
@@ -91,6 +108,65 @@ export default function TeacherDashboard() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  const syncProblemExpr = (nextBuilderItems) => {
+    const builderExpr = nextBuilderItems.map((item) => item.value).join(' ').replace(/\s+/g, ' ').trim();
+    setBuilderItems(nextBuilderItems);
+    setForm((current) => ({
+      ...current,
+      problem_expr: builderExpr || current.problem_expr,
+    }));
+  };
+
+  const handleDragStart = (event, block) => {
+    event.dataTransfer.setData('application/json', JSON.stringify(block));
+  };
+
+  const handleDropToken = (event) => {
+    event.preventDefault();
+    const payload = event.dataTransfer.getData('application/json');
+    if (!payload) return;
+    const block = JSON.parse(payload);
+    const nextBuilderItems = [
+      ...builderItems,
+      {
+        ...block,
+        uid: `${block.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      },
+    ];
+    syncProblemExpr(nextBuilderItems);
+  };
+
+  const removeBuilderItem = (uid) => {
+    const nextBuilderItems = builderItems.filter((item) => item.uid !== uid);
+    const builderExpr = nextBuilderItems.map((item) => item.value).join(' ').replace(/\s+/g, ' ').trim();
+    setBuilderItems(nextBuilderItems);
+    setForm((current) => ({
+      ...current,
+      problem_expr: builderExpr,
+    }));
+  };
+
+  const clearBuilder = () => {
+    setBuilderItems([]);
+    updateField('problem_expr', '');
+  };
+
+  const addCustomBuilderToken = () => {
+    const value = customBuilderToken.trim();
+    if (!value) return;
+    const nextBuilderItems = [
+      ...builderItems,
+      {
+        id: `custom-${Date.now()}`,
+        uid: `custom-${Date.now()}`,
+        label: value,
+        value,
+      },
+    ];
+    syncProblemExpr(nextBuilderItems);
+    setCustomBuilderToken('');
+  };
+
   const updateHint = (index, value) => {
     const nextHints = [...form.hints];
     nextHints[index] = value;
@@ -117,6 +193,8 @@ export default function TeacherDashboard() {
       setFormSuccess('Question created with premium AI routing.');
       setForm(DEFAULT_FORM);
       setAnalysis(null);
+      setBuilderItems([]);
+      setCustomBuilderToken('');
       await loadData();
     } catch (err) {
       setFormError(err.message);
@@ -323,6 +401,107 @@ export default function TeacherDashboard() {
                 </div>
 
                 <div className="form-group" style={{ marginTop: '24px' }}>
+                  <label>Drag & Drop SymPy Builder</label>
+                  <div style={{ display: 'grid', gap: '16px' }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: '10px',
+                      padding: '16px',
+                      border: '1px solid var(--border-main)',
+                      borderRadius: '14px',
+                      background: 'rgba(255,255,255,0.02)',
+                    }}>
+                      {BUILDER_LIBRARY.map((block) => (
+                        <button
+                          key={block.id}
+                          type="button"
+                          draggable
+                          onDragStart={(event) => handleDragStart(event, block)}
+                          onClick={() => {
+                            const nextBuilderItems = [
+                              ...builderItems,
+                              { ...block, uid: `${block.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` },
+                            ];
+                            syncProblemExpr(nextBuilderItems);
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid var(--border-main)',
+                            background: 'rgba(12,17,30,0.92)',
+                            color: 'white',
+                            textAlign: 'left',
+                            cursor: 'grab',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {block.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={handleDropToken}
+                      style={{
+                        minHeight: '96px',
+                        padding: '16px',
+                        borderRadius: '14px',
+                        border: '1px dashed var(--accent-primary)',
+                        background: 'rgba(94, 160, 255, 0.05)',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '12px' }}>
+                        DROP ZONE
+                      </div>
+                      {builderItems.length === 0 ? (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                          Drag blocks here to build a SymPy-friendly question such as `Find the Fourier Series of f(x)=x**2 on (-pi, pi)`.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                          {builderItems.map((item) => (
+                            <button
+                              key={item.uid}
+                              type="button"
+                              onClick={() => removeBuilderItem(item.uid)}
+                              style={{
+                                padding: '8px 10px',
+                                borderRadius: '999px',
+                                border: '1px solid rgba(94,160,255,0.25)',
+                                background: 'rgba(94,160,255,0.08)',
+                                color: 'var(--accent-primary)',
+                                cursor: 'pointer',
+                                fontSize: '0.82rem',
+                              }}
+                              title="Click to remove"
+                            >
+                              {item.label} ×
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        value={customBuilderToken}
+                        onChange={(e) => setCustomBuilderToken(e.target.value)}
+                        placeholder="Add custom token like x**3 or on (0, 2*pi)"
+                        style={{ flex: 1, minWidth: '240px' }}
+                      />
+                      <button type="button" className="btn btn-outline" onClick={addCustomBuilderToken}>
+                        Add Token
+                      </button>
+                      <button type="button" className="btn btn-outline" onClick={clearBuilder}>
+                        Clear Builder
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '24px' }}>
                   <label>Raw Expression (Sympy Compatible)</label>
                   <textarea
                     value={form.problem_expr}
@@ -435,7 +614,7 @@ export default function TeacherDashboard() {
                       <div style={{
                         marginTop: '14px',
                         padding: '14px 16px',
-                        background: 'rgba(0, 242, 255, 0.05)',
+                        background: 'rgba(94, 160, 255, 0.06)',
                         border: '1px solid var(--accent-primary)',
                         borderRadius: '8px',
                       }}>

@@ -77,6 +77,10 @@ LOCAL_DICT = {
 
 
 def infer_problem_type(problem_expr_str: str) -> str:
+    structured = parse_structured_problem(problem_expr_str)
+    if structured.get("problem_type"):
+        return structured["problem_type"]
+
     lowered = (problem_expr_str or "").lower()
     if "fourier series" in lowered:
         return "series"
@@ -97,6 +101,81 @@ def infer_problem_type(problem_expr_str: str) -> str:
     if any(keyword in lowered for keyword in ["dy/dx", "d2y", "differential equation"]):
         return "ode"
     return "integral"
+
+
+def normalize_problem_text(text: str) -> str:
+    """Normalize teacher-authored problem text into a more parser-friendly form."""
+    normalized = (text or "").strip()
+    normalized = normalized.replace("π", "pi")
+    normalized = normalized.replace("−", "-").replace("–", "-")
+    normalized = normalized.replace("²", "^2").replace("³", "^3")
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def parse_structured_problem(problem_expr_str: str) -> dict:
+    """Parse builder-style problem text into structured fields.
+
+    Supported examples:
+    - Find the Fourier Series of f(x)=x**2 on (-pi, pi)
+    - Find the Laplace Transform of f(x)=exp(x)
+    - Find the Inverse Laplace Transform of 1/(s-2)
+    """
+    raw = problem_expr_str or ""
+    normalized = normalize_problem_text(raw)
+    lowered = normalized.lower()
+
+    parsed = {
+        "raw": raw,
+        "normalized": normalized,
+        "problem_type": None,
+        "task": None,
+        "expression_text": None,
+        "interval": None,
+        "symmetry_hint": None,
+    }
+
+    if "fourier series" in lowered:
+        parsed["problem_type"] = "series"
+        parsed["task"] = "fourier_series"
+    elif "inverse laplace transform" in lowered:
+        parsed["problem_type"] = "transform"
+        parsed["task"] = "inverse_laplace_transform"
+    elif "laplace transform" in lowered:
+        parsed["problem_type"] = "transform"
+        parsed["task"] = "laplace_transform"
+
+    interval_match = re.search(r"\bon\s*\(\s*([^,]+)\s*,\s*([^)]+)\)", lowered)
+    if interval_match:
+        parsed["interval"] = (interval_match.group(1).strip(), interval_match.group(2).strip())
+
+    if "where f(-x)=f(x)" in lowered:
+        parsed["symmetry_hint"] = "even"
+    elif "where f(-x)=-f(x)" in lowered:
+        parsed["symmetry_hint"] = "odd"
+
+    fx_match = re.search(r"f\(x\)\s*=\s*(.+?)(?=\s+\bon\s*\(|\s+\bwhere\b|$)", normalized, flags=re.IGNORECASE)
+    if fx_match:
+        parsed["expression_text"] = fx_match.group(1).strip()
+    elif parsed["task"]:
+        task_match = re.search(
+            r"find the (?:fourier series|inverse laplace transform|laplace transform) of\s+(.+?)(?=\s+\bon\s*\(|\s+\bwhere\b|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if task_match:
+            parsed["expression_text"] = task_match.group(1).strip()
+
+    return parsed
+
+
+def _parse_structured_expression(problem_expr_str: str):
+    """Parse the extracted expression portion of a structured problem string."""
+    structured = parse_structured_problem(problem_expr_str)
+    expr_text = structured.get("expression_text")
+    if not expr_text:
+        return structured, None
+    return structured, parse_expression_candidate(expr_text)
 
 
 def preprocess_text(text: str) -> str:
@@ -1017,8 +1096,12 @@ def _line_mentions(line: str, *patterns: str) -> bool:
 
 def validate_fourier_series_steps(steps: list[str], problem_expr_str: str) -> dict:
     """Heuristic validation for common Fourier series derivations from the syllabus."""
-    problem_lower = (problem_expr_str or "").lower()
-    supports_standard_x_series = "f(x)=x" in problem_lower.replace(" ", "") or "f(x) = x" in problem_lower
+    structured, structured_expr = _parse_structured_expression(problem_expr_str)
+    supports_standard_x_series = (
+        structured_expr is not None
+        and structured.get("interval") == ("-pi", "pi")
+        and expressions_equal(structured_expr, x)
+    )
 
     if not supports_standard_x_series:
         return {
@@ -2007,7 +2090,8 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
     if not problem_expr_str:
         return None
 
-    resolved = strategy or infer_problem_type(problem_expr_str)
+    structured, structured_expr = _parse_structured_expression(problem_expr_str)
+    resolved = strategy or structured.get("problem_type") or infer_problem_type(problem_expr_str)
 
     # L-notation always indicates a transform problem
     if re.search(r"(?<![A-Za-z])L\s*[\[\{]", problem_expr_str) or re.search(
@@ -2028,6 +2112,12 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
             return format_expression(result) + " + C"
 
         if resolved == "transform":
+            if structured.get("task") == "laplace_transform" and structured_expr is not None:
+                correct = _compute_laplace(structured_expr, inverse=False)
+                return format_expression(correct) if correct is not None else None
+            if structured.get("task") == "inverse_laplace_transform" and structured_expr is not None:
+                correct = _compute_laplace(structured_expr, inverse=True)
+                return format_expression(correct) if correct is not None else None
             _, correct = _extract_laplace_inner(problem_expr_str)
             if correct is not None:
                 return format_expression(correct)
@@ -2051,7 +2141,12 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
             return f"y = {format_expression(antideriv)} + C"
 
         if resolved == "series":
-            return "x = 2·∑(((-1)^(n+1)·sin(n·x))/n, n=1→∞)"
+            if structured_expr is not None and structured.get("interval") == ("-pi", "pi"):
+                if expressions_equal(structured_expr, x):
+                    return "x = 2*sum(((-1)^(n+1)*sin(n*x))/n, (n,1,oo))"
+                if expressions_equal(structured_expr, x**2):
+                    return "pi^2/3 + sum(4*(-1)^n*cos(n*x)/n^2)"
+            return "x = 2*sum(((-1)^(n+1)*sin(n*x))/n, (n,1,oo))"
 
         # General fallback
         parsed = parse_expression_candidate(problem_expr_str)
@@ -2070,7 +2165,8 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
     if not problem_expr_str:
         return []
 
-    resolved = strategy or infer_problem_type(problem_expr_str)
+    structured, structured_expr = _parse_structured_expression(problem_expr_str)
+    resolved = strategy or structured.get("problem_type") or infer_problem_type(problem_expr_str)
     lowered = (problem_expr_str or "").lower()
 
     # L-notation override
@@ -2207,8 +2303,8 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
 
         # ── FOURIER SERIES ────────────────────────────────────────────────────
         elif resolved == "series":
-            compact = lowered.replace(" ", "")
-            if "f(x)=x" in compact:
+            compact = normalize_problem_text(structured.get("expression_text") or problem_expr_str).lower().replace(" ", "")
+            if structured_expr is not None and structured.get("interval") == ("-pi", "pi") and expressions_equal(structured_expr, x):
                 steps = [
                     {"step": 1, "title": "Identify symmetry",
                      "detail": "f(x) = x is an odd function on (−π, π)"},
@@ -2231,20 +2327,36 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
                     {"step": 10, "title": "First few terms",
                      "detail": "x ≈ 2[sin(x) − sin(2x)/2 + sin(3x)/3 − sin(4x)/4 + …]"},
                 ]
-            elif "f(x)=x**2" in compact or "f(x)=x^2" in compact:
+            elif structured_expr is not None and structured.get("interval") == ("-pi", "pi") and expressions_equal(structured_expr, x**2):
                 steps = [
                     {"step": 1, "title": "Identify symmetry",
-                     "detail": "f(x) = x² is an even function on (−π, π)"},
-                    {"step": 2, "title": "Sine terms vanish",
-                     "detail": "Since f(x) is even:  bₙ = 0 for all n"},
-                    {"step": 3, "title": "Compute a₀",
-                     "detail": "a₀ = (2/π)∫₀^π x² dx = (2/π)[x³/3]₀^π = 2π²/3"},
-                    {"step": 4, "title": "Compute aₙ",
-                     "detail": "aₙ = (2/π)∫₀^π x²·cos(nx) dx"},
-                    {"step": 5, "title": "Integrate by parts twice",
-                     "detail": "Result:  aₙ = 4(−1)ⁿ/n²"},
-                    {"step": 6, "title": "Write the Fourier series",
-                     "detail": "f(x) = π²/3 + 4·Σₙ₌₁^∞  [(−1)ⁿ/n²]·cos(nx)"},
+                     "detail": "f(-x) = f(x), so x^2 is even on (-pi, pi)."},
+                    {"step": 2, "title": "Set up a0 using symmetry",
+                     "detail": "a0 = (1/pi) * integral(-pi to pi) x^2 dx = (2/pi) * integral(0 to pi) x^2 dx"},
+                    {"step": 3, "title": "Evaluate a0",
+                     "detail": "a0 = (2/pi) * [x^3/3]_0^pi = (2/pi) * (pi^3/3) = 2*pi^2/3"},
+                    {"step": 4, "title": "Set up an using symmetry",
+                     "detail": "an = (1/pi) * integral(-pi to pi) x^2*cos(n*x) dx = (2/pi) * integral(0 to pi) x^2*cos(n*x) dx"},
+                    {"step": 5, "title": "Define the core integral",
+                     "detail": "Let I = integral x^2*cos(n*x) dx"},
+                    {"step": 6, "title": "First integration by parts",
+                     "detail": "Choose u = x^2 and dv = cos(n*x) dx, so du = 2*x dx and v = sin(n*x)/n"},
+                    {"step": 7, "title": "Expand the first IBP result",
+                     "detail": "I = x^2*sin(n*x)/n - (2/n) * integral x*sin(n*x) dx"},
+                    {"step": 8, "title": "Second integration by parts",
+                     "detail": "For integral x*sin(n*x) dx, choose u = x and dv = sin(n*x) dx"},
+                    {"step": 9, "title": "Simplify the nested integral",
+                     "detail": "integral x*sin(n*x) dx = -x*cos(n*x)/n + sin(n*x)/n^2"},
+                    {"step": 10, "title": "Substitute back into I",
+                     "detail": "I = x^2*sin(n*x)/n + 2*x*cos(n*x)/n^2 - 2*sin(n*x)/n^3"},
+                    {"step": 11, "title": "Evaluate the boundary values",
+                     "detail": "Using sin(n*pi)=0 and cos(n*pi)=(-1)^n, the definite integral gives I = 2*pi*(-1)^n / n^2"},
+                    {"step": 12, "title": "Compute an",
+                     "detail": "an = (2/pi) * I = (2/pi) * (2*pi*(-1)^n / n^2) = 4*(-1)^n / n^2"},
+                    {"step": 13, "title": "Compute bn",
+                     "detail": "bn = 0 because x^2 is even and sin(n*x) is odd on (-pi, pi)."},
+                    {"step": 14, "title": "Assemble the Fourier series",
+                     "detail": "f(x) = a0/2 + sum(an*cos(n*x)) = pi^2/3 + sum(4*(-1)^n*cos(n*x)/n^2)"},
                 ]
             else:
                 steps = [
