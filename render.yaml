@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: maths-platform
+    runtime: python
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false       # Set this manually in the Render dashboard
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+databases:
+  - name: maths-platform-db
+    databaseName: maths_platform
+    user: maths_platform
