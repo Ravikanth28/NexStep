@@ -7,7 +7,7 @@ from models import Question, Submission, StepLog, User
 from auth import get_current_user
 from validation_engine import build_learning_feedback, validate_steps, get_hint, compute_correct_answer, generate_solution_steps
 from syllabus_engine import build_validation_notes, analyze_question_text, deserialize_concept_tags
-from ai_engine import get_ai_response
+from ai_engine import evaluate_student_solution
 
 router = APIRouter(prefix="/api", tags=["validation"])
 
@@ -47,11 +47,32 @@ async def validate_solution(
 
     # Validate steps using SymPy engine
     analysis = analyze_question_text(question.title, question.problem_expr, question.topic)
-    result = validate_steps(
-        req.steps,
+    strategy = question.validation_strategy or question.problem_type or analysis.strategy
+    solution_steps = generate_solution_steps(
         question.problem_expr,
-        question.validation_strategy or question.problem_type or analysis.strategy,
+        strategy,
     )
+    correct_answer = compute_correct_answer(
+        question.problem_expr,
+        strategy,
+    )
+
+    result = await evaluate_student_solution(
+        problem=question.problem_expr,
+        student_steps=req.steps,
+        reference_steps=solution_steps,
+        correct_answer=correct_answer,
+        strategy=strategy,
+    )
+
+    if not result:
+        result = validate_steps(
+            req.steps,
+            question.problem_expr,
+            strategy,
+        )
+        if "correct_answer" not in result or result.get("correct_answer") is None:
+            result["correct_answer"] = correct_answer
 
     # Save submission
     is_correct = result["verdict"] == "Correct"
@@ -106,14 +127,14 @@ async def validate_solution(
         "feedback": build_learning_feedback(
             result,
             question.topic or analysis.topic,
-            question.validation_strategy or analysis.strategy,
+            strategy,
         ),
         "question_analysis": {
             "subject": question.subject or analysis.subject,
             "topic": question.topic or analysis.topic,
             "unit_name": question.unit_name or analysis.unit_name,
-            "problem_type": question.problem_type or analysis.strategy,
-            "validation_strategy": question.validation_strategy or analysis.strategy,
+            "problem_type": question.problem_type or strategy,
+            "validation_strategy": question.validation_strategy or strategy,
             "concept_tags": deserialize_concept_tags(question.concept_tags) or analysis.concept_tags,
             "analysis_confidence": question.analysis_confidence or analysis.confidence,
             "notes": build_validation_notes(analysis),
@@ -124,10 +145,9 @@ async def validate_solution(
             "level": current_user.level,
             "leveled_up": leveled_up
         },
-        "solution_steps": generate_solution_steps(
-            question.problem_expr,
-            question.validation_strategy or question.problem_type or analysis.strategy,
-        ),
+        "solution_steps": solution_steps,
+        "evaluation_mode": "ai_against_sympy_reference" if result.get("overall_feedback") is not None else "symbolic_fallback",
+        "overall_feedback": result.get("overall_feedback"),
     }
 
 
@@ -243,7 +263,7 @@ async def vision_parse_math(
     req: VisionRequest,
     current_user: User = Depends(_resolve_user)
 ):
-    """Use Gemini Flash to ingest handwritten math images."""
+    """Use the configured AI provider to ingest handwritten math images."""
     from ai_engine import get_ai_response
     
     system_prompt = """
@@ -259,7 +279,7 @@ async def vision_parse_math(
     """
     
     # Simulation: We send the request to the AI engine.
-    # In a production environment, we'd pass the actual base64 to the Gemini Vision API.
+    # In a production environment, we'd pass the actual base64 to a vision-capable model.
     full_str = str(req.image_b64)
     short_str = full_str[0:100] if len(full_str) > 100 else full_str
     prompt = f"Extract steps from this mathematical image (Base64 data provided: {short_str}...)"

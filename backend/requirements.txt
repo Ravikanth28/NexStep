@@ -8,5 +8,5 @@ bcrypt==4.0.1
 python-multipart==0.0.12
 python-dotenv
 psycopg2
-google-generativeai
 httpx
+openai
