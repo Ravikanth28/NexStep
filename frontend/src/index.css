@@ -1191,6 +1191,27 @@ canvas.mathbox-canvas {
   color: rgba(255, 255, 255, 0.38);
 }
 
+/* ── MathLive math-field dark-theme overrides ─────────────────────── */
+math-field {
+  --hue: 210;
+  --caret-color: #00e5be;
+  --selection-background-color: rgba(0, 229, 190, 0.2);
+  --contains-highlight-background-color: rgba(0, 229, 190, 0.1);
+  --highlight-text: rgba(0, 229, 190, 0.15);
+  --text-font-family: 'JetBrains Mono', monospace;
+  color-scheme: dark;
+}
+
+/* Ensure the internal editor area is transparent and white-coloured */
+math-field::part(container) {
+  background: transparent;
+  color: #dde7f5;
+}
+
+math-field::part(virtual-keyboard-toggle) {
+  display: none; /* hide default mobile toggle – we use our own keyboard */
+}
+
 .solver-action-bar {
   display: flex;
   gap: 16px;

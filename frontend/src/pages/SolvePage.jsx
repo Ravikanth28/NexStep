@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getHint as apiGetHint, getQuestion, validateSteps } from '../api';
 import MathKeyboard from '../components/MathKeyboard';
+import MathStepEditor from '../components/MathStepEditor';
 
 function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60);
@@ -13,7 +14,7 @@ export default function SolvePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [question, setQuestion] = useState(null);
-  const [text, setText] = useState('');
+  const [steps, setSteps] = useState(['']);
   const [results, setResults] = useState(null);
   const [verdict, setVerdict] = useState(null);
   const [correctAnswer, setCorrectAnswer] = useState(null);
@@ -30,8 +31,8 @@ export default function SolvePage() {
   const [hintLoading, setHintLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
-  const textareaRef = useRef(null);
-  const lineNumbersRef = useRef(null);
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const insertFromKeyboardRef = useRef(null);
 
   useEffect(() => {
     loadQuestion();
@@ -57,38 +58,22 @@ export default function SolvePage() {
     }
   };
 
-  const handleTextChange = (e) => {
-    setText(e.target.value);
+  const handleStepsChange = useCallback((newSteps) => {
+    setSteps(newSteps);
     if (!timerActive) setTimerActive(true);
-  };
+  }, [timerActive]);
 
-  const handleScroll = () => {
-    if (lineNumbersRef.current && textareaRef.current) {
-      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+  // Called by MathKeyboard – forwards LaTeX into the active MathLive field
+  const handleInsertSymbol = (latex) => {
+    if (insertFromKeyboardRef.current) {
+      insertFromKeyboardRef.current(latex);
     }
-  };
-
-  const handleInsertSymbol = (symbol, selectStart, selectEnd) => {
-    const editor = textareaRef.current;
-    if (!editor) return;
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const nextValue = text.substring(0, start) + symbol + text.substring(end);
-    setText(nextValue);
     if (!timerActive) setTimerActive(true);
-    setTimeout(() => {
-      editor.focus();
-      if (selectStart !== undefined && selectEnd !== undefined) {
-        editor.setSelectionRange(start + selectStart, start + selectEnd);
-      } else {
-        editor.setSelectionRange(start + symbol.length, start + symbol.length);
-      }
-    }, 0);
   };
 
   const handleValidate = async () => {
-    const steps = text.split('\n').map((line) => line.trim()).filter(Boolean);
-    if (steps.length === 0) return;
+    const latexSteps = steps.filter((s) => s.trim());
+    if (latexSteps.length === 0) return;
 
     setValidating(true);
     setResults(null);
@@ -104,7 +89,14 @@ export default function SolvePage() {
     setTimerActive(false);
 
     try {
-      const data = await validateSteps({ question_id: parseInt(id, 10), steps });
+      // Send latex_steps so the backend converts them to SymPy via parse_latex.
+      // Also send a plain-text fallback in `steps` (the same strings) in case
+      // the question was entered in SymPy notation directly.
+      const data = await validateSteps({
+        question_id: parseInt(id, 10),
+        steps: latexSteps,          // fallback plain steps
+        latex_steps: latexSteps,    // primary: LaTeX from MathLive
+      });
       setResults(data.steps || []);
       setVerdict(data.verdict || null);
       setCorrectAnswer(data.correct_answer || null);
@@ -126,8 +118,7 @@ export default function SolvePage() {
   const handleGetHint = async () => {
     setHintLoading(true);
     try {
-      const parsedSteps = text.split('\n').map((line) => line.trim()).filter(Boolean);
-      const data = await apiGetHint({ question_id: parseInt(id, 10), step_number: parsedSteps.length });
+      const data = await apiGetHint({ question_id: parseInt(id, 10), step_number: steps.filter(s => s.trim()).length });
       setHint(data.hint);
     } catch (err) {
       console.error(err);
@@ -138,7 +129,7 @@ export default function SolvePage() {
 
   const handleReset = () => {
     if (!window.confirm('Delete all code and reset?')) return;
-    setText('');
+    setSteps(['']);
     setResults(null);
     setVerdict(null);
     setCorrectAnswer(null);
@@ -179,7 +170,7 @@ export default function SolvePage() {
     );
   }
 
-  const lines = text.split('\n');
+  const activeStepCount = steps.filter((s) => s.trim()).length;
   const validCount = results ? results.filter((r) => r.valid).length : 0;
   const invalidCount = results ? results.length - validCount : 0;
 
@@ -259,21 +250,17 @@ export default function SolvePage() {
                 <div className="solver-kicker">Student Workspace</div>
                 <h3 className="solver-title">Editor [UTF-8]</h3>
               </div>
-              <div className="solver-head-badge">{lines.filter((line) => line.trim()).length} lines</div>
+              <div className="solver-head-badge">{activeStepCount} steps</div>
             </div>
             <div className="solver-panel-body">
-              <div className="solver-editor-shell solver-editor-shell-tall">
-                <div className="solver-editor-gutter" ref={lineNumbersRef}>
-                  {lines.map((_, i) => <div key={i} className="solver-editor-line">{i + 1}</div>)}
-                </div>
-                <textarea
-                  ref={textareaRef}
-                  value={text}
-                  onChange={handleTextChange}
-                  onScroll={handleScroll}
-                  spellCheck={false}
-                  className="solver-editor"
-                  placeholder="Insert symbolic steps here... (e.g. ∫(2x+1)dx)"
+              <div className="solver-editor-shell solver-editor-shell-tall" style={{ padding: '12px 16px', overflowY: 'auto' }}>
+                <MathStepEditor
+                  steps={steps}
+                  onChange={handleStepsChange}
+                  results={results}
+                  onInsertFromKeyboard={insertFromKeyboardRef}
+                  activeStepIndex={activeStepIndex}
+                  onActiveStepChange={setActiveStepIndex}
                 />
               </div>
 

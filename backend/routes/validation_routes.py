@@ -1,7 +1,9 @@
 import json
+import warnings
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
 from database import get_db
 from models import Question, Submission, StepLog, User
 from auth import get_current_user
@@ -12,9 +14,25 @@ from ai_engine import evaluate_student_solution
 router = APIRouter(prefix="/api", tags=["validation"])
 
 
+def _latex_to_sympy_str(latex: str) -> str:
+    """Convert a LaTeX expression string to a SymPy-parseable string.
+    Falls back to the original string if conversion fails."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from sympy.parsing.latex import parse_latex
+            expr = parse_latex(latex)
+            from sympy import srepr
+            # Use SymPy's own str() which produces parseable notation
+            return str(expr)
+    except Exception:
+        return latex
+
+
 class ValidateRequest(BaseModel):
     question_id: int
     steps: list[str]
+    latex_steps: Optional[list[str]] = None   # visual-editor LaTeX steps
     time_taken: int = 0
 
 
@@ -41,6 +59,11 @@ async def validate_solution(
     question = db.query(Question).filter(Question.id == req.question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+
+    # If the client sent LaTeX steps (from the visual editor), convert them to
+    # SymPy-parseable strings and use those as the canonical steps list.
+    if req.latex_steps:
+        req.steps = [_latex_to_sympy_str(s) for s in req.latex_steps if s.strip()]
 
     if not req.steps or len(req.steps) == 0:
         raise HTTPException(status_code=400, detail="No steps provided")
