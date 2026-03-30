@@ -17,7 +17,7 @@ const SYMBOLS = {
     { label: '=', insert: '=' },
     { label: '(', insert: '(' },
     { label: ')', insert: ')' },
-    { label: '|x|', insert: '\\left|\\right|' },
+    { label: '|x|', insert: '|' },
     { label: 'log', insert: '\\log' },
     { label: 'ln', insert: '\\ln' },
   ],

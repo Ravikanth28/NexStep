@@ -14,19 +14,57 @@ from ai_engine import evaluate_student_solution
 router = APIRouter(prefix="/api", tags=["validation"])
 
 
+# ── LaTeX → SymPy pre-processing table ─────────────────────────────────────
+# parse_latex chokes on several common MathLive outputs; we normalise them
+# before handing off to the parser.
+import re as _re
+
+_LATEX_REPLACEMENTS = [
+    # Absolute value: \left|x\right| → |x|
+    (_re.compile(r'\\left\s*\|'), '|'),
+    (_re.compile(r'\\right\s*\|'), '|'),
+    # Arrows (used as "therefore" / implication steps) – strip them cleanly
+    (_re.compile(r'\\(to|rightarrow|Rightarrow|longrightarrow|Longrightarrow)\b'), ''),
+    # \, \; \! thin spaces – remove
+    (_re.compile(r'\\[,;!]'), ' '),
+    # \text{...} – keep the inner text
+    (_re.compile(r'\\text\{([^}]*)\}'), r'\1'),
+    # \cdot → *
+    (_re.compile(r'\\cdot'), '*'),
+]
+
+
+def _preprocess_latex(latex: str) -> str:
+    s = latex.strip()
+    for pattern, repl in _LATEX_REPLACEMENTS:
+        s = pattern.sub(repl, s)
+    return s.strip()
+
+
 def _latex_to_sympy_str(latex: str) -> str:
     """Convert a LaTeX expression string to a SymPy-parseable string.
-    Falls back to the original string if conversion fails."""
+    Applies known normalisations before calling parse_latex, then falls
+    back to the original string if conversion still fails."""
+    cleaned = _preprocess_latex(latex)
+    # If the step is empty after stripping arrow/space noise, return as-is
+    if not cleaned:
+        return latex
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             from sympy.parsing.latex import parse_latex
-            expr = parse_latex(latex)
-            from sympy import srepr
-            # Use SymPy's own str() which produces parseable notation
+            expr = parse_latex(cleaned)
             return str(expr)
     except Exception:
-        return latex
+        # Second chance: try the original unmodified latex
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from sympy.parsing.latex import parse_latex
+                expr = parse_latex(latex)
+                return str(expr)
+        except Exception:
+            return latex
 
 
 class ValidateRequest(BaseModel):
