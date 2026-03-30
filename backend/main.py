@@ -2,6 +2,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from database import engine, Base, ensure_schema
 from routes import auth_routes, question_routes, validation_routes, dashboard_routes
 
@@ -42,7 +43,16 @@ def health_check():
     return {"status": "healthy"}
 
 
-# Serve the built React frontend — must be mounted last so API routes take priority
+# Serve the built React frontend — SPA fallback for React Router
 _static_dir = Path(__file__).parent.parent / "frontend" / "dist"
 if _static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")
+    # Serve /assets/* (JS, CSS, images) as true static files
+    _assets_dir = _static_dir / "assets"
+    if _assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+
+    # Catch-all: any path not matched by an API route returns index.html
+    # so that React Router handles client-side navigation correctly.
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        return FileResponse(str(_static_dir / "index.html"))
