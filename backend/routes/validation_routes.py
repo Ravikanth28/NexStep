@@ -227,7 +227,37 @@ async def get_hint_for_question(
         raise HTTPException(status_code=404, detail="Question not found")
 
     hint = get_hint(question.problem_expr, req.step_number)
-    return {"hint": hint}
+
+    # Ask AI for relevant formulas to solve this problem
+    from ai_engine import get_ai_response
+    formula_system = (
+        "You are a mathematics tutor. Given a math problem, list the key formulas a student needs to solve it. "
+        "Return a JSON object with exactly two keys:\n"
+        "  \"formulas\": an array of objects, each with \"name\" (formula name) and \"latex\" (the formula in LaTeX).\n"
+        "  \"approach\": one sentence describing the overall approach.\n"
+        "Return only valid JSON, no markdown fences."
+    )
+    formula_prompt = f"Problem: {question.problem_expr}\nTopic: {question.topic or ''}"
+
+    formulas = []
+    approach = ""
+    try:
+        raw = await get_ai_response(formula_prompt, formula_system)
+        import json as _json
+        # strip markdown fences if present
+        clean = raw.strip()
+        if clean.startswith("```"):
+            clean = clean.split("```")[1]
+            if clean.startswith("json"):
+                clean = clean[4:]
+            clean = clean.strip()
+        parsed = _json.loads(clean)
+        formulas = parsed.get("formulas", [])
+        approach = parsed.get("approach", "")
+    except Exception:
+        pass
+
+    return {"hint": hint, "formulas": formulas, "approach": approach}
 
 
 class StepHintRequest(BaseModel):

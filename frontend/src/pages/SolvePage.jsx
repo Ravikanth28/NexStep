@@ -28,6 +28,8 @@ export default function SolvePage() {
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [hint, setHint] = useState('');
+  const [hintFormulas, setHintFormulas] = useState([]);
+  const [hintApproach, setHintApproach] = useState('');
   const [hintLoading, setHintLoading] = useState(false);
   const [stepHints, setStepHints] = useState({});
   const [loadingHintIndex, setLoadingHintIndex] = useState(null);
@@ -122,6 +124,8 @@ export default function SolvePage() {
     try {
       const data = await apiGetHint({ question_id: parseInt(id, 10), step_number: steps.filter(s => s.trim()).length });
       setHint(data.hint);
+      setHintFormulas(data.formulas || []);
+      setHintApproach(data.approach || '');
     } catch (err) {
       console.error(err);
     } finally {
@@ -155,6 +159,8 @@ export default function SolvePage() {
     setQuestionAnalysis(null);
     setFeedback(null);
     setHint('');
+    setHintFormulas([]);
+    setHintApproach('');
     setStepHints({});
     setSubmissionId(null);
     setSolutionSteps([]);
@@ -296,9 +302,44 @@ export default function SolvePage() {
                 </button>
               </div>
 
-              {hint && (
-                <div className="solver-hint">
-                  <strong>AI Suggested Path:</strong> {hint}
+              {(hint || hintFormulas.length > 0) && (
+                <div className="solver-hint" style={{ padding: '20px 24px', borderTop: '1px solid var(--border-main)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {hintApproach && (
+                    <div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '0.08em', marginBottom: '4px' }}>APPROACH</div>
+                      <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{hintApproach}</div>
+                    </div>
+                  )}
+                  {hint && (
+                    <div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '0.08em', marginBottom: '4px' }}>AI HINT</div>
+                      <div style={{ fontSize: '0.88rem' }}>{hint}</div>
+                    </div>
+                  )}
+                  {hintFormulas.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#f0c040', letterSpacing: '0.08em', marginBottom: '10px' }}>📋 RELEVANT FORMULAS</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {hintFormulas.map((f, i) => (
+                          <div key={i} style={{ background: 'rgba(255,200,0,0.05)', border: '1px solid rgba(255,200,0,0.18)', borderRadius: '8px', padding: '12px 16px' }}>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#f0c040', letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase' }}>{f.name}</div>
+                            <math-field
+                              read-only=""
+                              style={{
+                                display: 'block',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                fontSize: '1.05rem',
+                                outline: 'none',
+                                '--text-font-family': 'JetBrains Mono',
+                              }}
+                            >{f.latex}</math-field>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
