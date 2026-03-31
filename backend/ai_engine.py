@@ -260,7 +260,8 @@ async def evaluate_student_solution(
                 "step": index,
                 "expression": item.get("expression") or original_step,
                 "valid": bool(item.get("valid")),
-                "error": item.get("error") or item.get("feedback"),
+                "error": item.get("error") if not item.get("valid") else None,
+                "feedback": item.get("feedback") if item.get("valid") else None,
             })
 
         verdict = parsed.get("verdict", "Needs Review")

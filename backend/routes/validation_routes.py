@@ -102,8 +102,9 @@ async def validate_solution(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    # If the client sent LaTeX steps (from the visual editor), convert them to
-    # SymPy-parseable strings and use those as the canonical steps list.
+    # Keep the original LaTeX steps for the AI evaluator (human-readable),
+    # but convert them to SymPy strings for the symbolic engine.
+    original_latex_steps = req.latex_steps or req.steps
     if req.latex_steps:
         req.steps = [_latex_to_sympy_str(s) for s in req.latex_steps if s.strip()]
 
@@ -124,7 +125,7 @@ async def validate_solution(
 
     result = await evaluate_student_solution(
         problem=question.problem_expr,
-        student_steps=req.steps,
+        student_steps=original_latex_steps,  # send readable LaTeX to AI
         reference_steps=solution_steps,
         correct_answer=correct_answer,
         strategy=strategy,

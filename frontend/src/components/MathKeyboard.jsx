@@ -66,6 +66,12 @@ const SYMBOLS = {
     { label: 'ℒ⁻¹', insert: '\\mathcal{L}^{-1}' },
     { label: 'ℱ', insert: '\\mathcal{F}' },
     { label: '𝒵', insert: '\\mathcal{Z}' },
+    { label: 'a₀', insert: 'a_0' },
+    { label: 'aₙ', insert: 'a_n' },
+    { label: 'bₙ', insert: 'b_n' },
+    { label: 'f(x)', insert: 'f(x)' },
+    { label: 'cos nx', insert: '\\cos nx' },
+    { label: 'sin nx', insert: '\\sin nx' },
     { label: 'grad', insert: '\\nabla' },
     { label: 'div', insert: '\\nabla\\cdot' },
     { label: 'curl', insert: '\\nabla\\times' },
@@ -119,6 +125,14 @@ export default function MathKeyboard({ onInsert }) {
   const [matrixCols, setMatrixCols] = useState(2);
   const [lowerLimit, setLowerLimit] = useState('0');
   const [upperLimit, setUpperLimit] = useState('\\infty');
+  const [fourierInterval, setFourierInterval] = useState('0_2pi');  // '0_2pi' | 'neg_pi_pi'
+
+  const FOURIER_CONFIGS = {
+    '0_2pi':    { lower: '0',     upper: '2\\pi',  label: '(0, 2π)' },
+    'neg_pi_pi':{ lower: '-\\pi', upper: '\\pi',   label: '(-π, π)' },
+  };
+
+  const fi = FOURIER_CONFIGS[fourierInterval];
 
   const buildCustomMatrix = (e) => {
     e.preventDefault();
@@ -163,6 +177,45 @@ export default function MathKeyboard({ onInsert }) {
           </button>
         ))}
       </div>
+
+      {activeTab === 'Transforms' && (
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(0,229,190,0.03)' }}>
+          <div style={{ fontSize: '0.62rem', color: '#00e5be', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>FOURIER COEFFICIENTS</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Interval:</label>
+            <select
+              value={fourierInterval}
+              onChange={(e) => setFourierInterval(e.target.value)}
+              style={{ padding: '4px 8px', borderRadius: '6px', background: '#0e1628', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.78rem', cursor: 'pointer' }}
+            >
+              <option value="0_2pi" style={{ background: '#0e1628', color: 'white' }}>(0, 2π)</option>
+              <option value="neg_pi_pi" style={{ background: '#0e1628', color: 'white' }}>(-π, π)</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`a_0 = \\frac{1}{\\pi}\\int_{${fi.lower}}^{${fi.upper}} f(x)\\,dx`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #00e5be', background: 'rgba(0,229,190,0.08)', color: '#00e5be', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+            >a₀</button>
+            <button type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`a_n = \\frac{1}{\\pi}\\int_{${fi.lower}}^{${fi.upper}} f(x)\\cos nx\\,dx`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #00e5be', background: 'rgba(0,229,190,0.08)', color: '#00e5be', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+            >aₙ</button>
+            <button type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`b_n = \\frac{1}{\\pi}\\int_{${fi.lower}}^{${fi.upper}} f(x)\\sin nx\\,dx`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #00e5be', background: 'rgba(0,229,190,0.08)', color: '#00e5be', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+            >bₙ</button>
+            <button type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`f(x) = \\frac{a_0}{2} + \\sum_{n=1}^{\\infty} a_n \\cos nx + \\sum_{n=1}^{\\infty} b_n \\sin nx`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(0,229,190,0.4)', background: 'rgba(0,229,190,0.05)', color: '#00e5be', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >f(x) series</button>
+            <button type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`\\int u\\,dv = uv - u'v_1 + u''v_2 - u'''v_3 + \\cdots`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #f0a500', background: 'rgba(240,165,0,0.08)', color: '#f0a500', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >Bernoulli ∫</button>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'Calculus' && (
         <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(94,160,255,0.04)' }}>

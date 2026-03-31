@@ -256,20 +256,39 @@ function StepHintBox({ hint }) {
 
 // ─── feedback tooltip under a step ─────────────────────────────────────────
 function StepFeedback({ result }) {
-  if (!result || result.valid) return null;
-  return (
-    <div
-      style={{
-        marginLeft: '56px',
-        marginBottom: '4px',
-        fontSize: '0.72rem',
-        color: '#ff4b6e',
-        fontFamily: 'JetBrains Mono',
-      }}
-    >
-      {result.feedback || result.error || 'Incorrect'}
-    </div>
-  );
+  if (!result) return null;
+  if (!result.valid) {
+    return (
+      <div
+        style={{
+          marginLeft: '56px',
+          marginBottom: '4px',
+          fontSize: '0.72rem',
+          color: '#ff4b6e',
+          fontFamily: 'JetBrains Mono',
+        }}
+      >
+        {result.error || result.feedback || 'Incorrect'}
+      </div>
+    );
+  }
+  if (result.feedback) {
+    return (
+      <div
+        style={{
+          marginLeft: '56px',
+          marginBottom: '4px',
+          fontSize: '0.72rem',
+          color: '#60d394',
+          fontFamily: 'JetBrains Mono',
+          opacity: 0.8,
+        }}
+      >
+        {result.feedback}
+      </div>
+    );
+  }
+  return null;
 }
 
 // ─── main editor ────────────────────────────────────────────────────────────
