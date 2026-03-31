@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getHint as apiGetHint, getQuestion, getStepHint, validateSteps } from '../api';
+import 'mathlive';
 import MathKeyboard from '../components/MathKeyboard';
 import MathStepEditor from '../components/MathStepEditor';
 
@@ -64,8 +65,17 @@ export default function SolvePage() {
 
   const handleStepsChange = useCallback((newSteps) => {
     setSteps(newSteps);
+    // Clear stale validation results so old markers don't show on edited steps
+    if (results) {
+      setResults(null);
+      setVerdict(null);
+      setCorrectAnswer(null);
+      setValidationError('');
+      setOverallFeedback('');
+      setFeedback(null);
+    }
     if (!timerActive) setTimerActive(true);
-  }, [timerActive]);
+  }, [timerActive, results]);
 
   // Called by MathKeyboard – forwards LaTeX into the active MathLive field
   const handleInsertSymbol = (latex) => {
@@ -228,7 +238,10 @@ export default function SolvePage() {
               <div className="badge badge-hard">{question.difficulty}</div>
             </div>
             <div className="problem" style={{ fontSize: '1.5rem', padding: '24px', background: 'rgba(0,0,0,0.5)', borderColor: 'var(--accent-primary)' }}>
-              {question.problem_expr}
+              <math-field
+                read-only
+                style={{ fontSize: '1.4rem', background: 'transparent', color: 'inherit', border: 'none', width: '100%' }}
+              >{question.problem_expr}</math-field>
             </div>
           </div>
 
@@ -294,7 +307,7 @@ export default function SolvePage() {
 
               <div className="solver-action-bar">
                 <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={handleValidate} disabled={validating}>
-                  {validating ? <div className="spinner"></div> : 'Commit & Validate'}
+                  {validating ? <div className="spinner"></div> : (verdict ? 'Resubmit' : 'Commit & Validate')}
                 </button>
                 <button className="btn btn-outline" onClick={handleReset}>Reset Workspace</button>
                 <button className="btn btn-outline" onClick={handleGetHint} disabled={hintLoading}>
