@@ -47,10 +47,14 @@ const SYMBOLS = {
     { label: 'dz', insert: 'dz' },
   ],
   Matrices: [
-    { label: '[ ]', insert: '\\begin{pmatrix}\\end{pmatrix}' },
-    { label: 'det', insert: '\\det' },
-    { label: 'A⁻¹', insert: '^{-1}' },
-    { label: 'Aᵀ', insert: '^{T}' },
+    { label: '1×2', insert: '\\begin{pmatrix} a & b \\end{pmatrix}' },
+    { label: '2×1', insert: '\\begin{pmatrix} a \\\\ b \\end{pmatrix}' },
+    { label: '2×2', insert: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' },
+    { label: '2×3', insert: '\\begin{pmatrix} a & b & c \\\\ d & e & f \\end{pmatrix}' },
+    { label: '3×3', insert: '\\begin{pmatrix} a & b & c \\\\ d & e & f \\\\ g & h & i \\end{pmatrix}' },
+    { label: '[ ]ᵀ', insert: '^{T}' },
+    { label: '[ ]⁻¹', insert: '^{-1}' },
+    { label: 'det', insert: '\\det\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' },
     { label: 'I', insert: 'I' },
     { label: 'λ', insert: '\\lambda' },
     { label: 'Rank', insert: '\\operatorname{rank}' },
@@ -111,6 +115,22 @@ const SYMBOLS = {
 
 export default function MathKeyboard({ onInsert }) {
   const [activeTab, setActiveTab] = useState('Basic');
+  const [matrixRows, setMatrixRows] = useState(2);
+  const [matrixCols, setMatrixCols] = useState(2);
+  const [lowerLimit, setLowerLimit] = useState('0');
+  const [upperLimit, setUpperLimit] = useState('\\infty');
+
+  const buildCustomMatrix = (e) => {
+    e.preventDefault();
+    const r = Math.max(1, Math.min(6, matrixRows));
+    const c = Math.max(1, Math.min(6, matrixCols));
+    const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+    const rows = Array.from({ length: r }, (_, ri) =>
+      Array.from({ length: c }, (_, ci) => letters[(ri * c + ci) % 26]).join(' & ')
+    );
+    const latex = `\\begin{pmatrix} ${rows.join(' \\\\\\ ')} \\end{pmatrix}`;
+    onInsert(latex);
+  };
 
   return (
     <div className="math-keyboard">
@@ -143,6 +163,110 @@ export default function MathKeyboard({ onInsert }) {
           </button>
         ))}
       </div>
+
+      {activeTab === 'Calculus' && (
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(94,160,255,0.04)' }}>
+          <div style={{ fontSize: '0.62rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>CUSTOM LIMITS</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Lower</label>
+              <input
+                type="text"
+                value={lowerLimit}
+                onChange={(e) => setLowerLimit(e.target.value)}
+                placeholder="0"
+                style={{ width: '56px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Upper</label>
+              <input
+                type="text"
+                value={upperLimit}
+                onChange={(e) => setUpperLimit(e.target.value)}
+                placeholder="\infty"
+                style={{ width: '56px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`\\int_{${lowerLimit}}^{${upperLimit}}`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--accent-primary)', background: 'rgba(94,160,255,0.12)', color: 'var(--accent-primary)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              ∫ Insert
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`\\left[\\right]_{${lowerLimit}}^{${upperLimit}}`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #f0a500', background: 'rgba(240,165,0,0.10)', color: '#f0a500', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              [ ]ₐᵇ
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`\\sum_{n=${lowerLimit}}^{${upperLimit}}`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--accent-secondary)', background: 'rgba(160,94,255,0.12)', color: 'var(--accent-secondary)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Σ Insert
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); onInsert(`\\lim_{x \\to ${lowerLimit}}`); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--accent-success)', background: 'rgba(0,229,190,0.08)', color: 'var(--accent-success)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              lim Insert
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'Matrices' && (
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(94,160,255,0.04)' }}>
+          <div style={{ fontSize: '0.62rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>CUSTOM MATRIX SIZE</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Rows (lower)</label>
+              <input
+                type="number"
+                min={1}
+                max={6}
+                value={matrixRows}
+                onChange={(e) => setMatrixRows(Number(e.target.value))}
+                style={{ width: '48px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+              />
+            </div>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>×</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Cols (upper)</label>
+              <input
+                type="number"
+                min={1}
+                max={6}
+                value={matrixCols}
+                onChange={(e) => setMatrixCols(Number(e.target.value))}
+                style={{ width: '48px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={buildCustomMatrix}
+              style={{
+                padding: '5px 14px',
+                borderRadius: '6px',
+                border: '1px solid var(--accent-primary)',
+                background: 'rgba(94,160,255,0.12)',
+                color: 'var(--accent-primary)',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Insert {matrixRows}×{matrixCols}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="keyboard-keys" style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
         {SYMBOLS[activeTab].map((sym, idx) => (

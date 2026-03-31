@@ -47,6 +47,7 @@ export const getSyllabusMeta = () => request('/questions/meta/syllabus');
 // Validation
 export const validateSteps = (body) => request('/validate', { method: 'POST', body: JSON.stringify(body) });
 export const getHint = (body) => request('/hint', { method: 'POST', body: JSON.stringify(body) });
+export const getStepHint = (body) => request('/step-hint', { method: 'POST', body: JSON.stringify(body) });
 export const visionParse = (body) => request('/vision-parse', { method: 'POST', body: JSON.stringify(body) });
 
 // Submissions

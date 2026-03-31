@@ -35,8 +35,8 @@ function DragHandle({ onMouseDown }) {
 function StepRow({
   index, latex, onChange, onRemove, onAddAfter, onFocus, stepResult, readonly,
   isDragOver, dragOverPos, onDragStart, onDragEnter, onDragOver, onDrop, onDragEnd,
+  mfRef, onHint, hintLoading,
 }) {
-  const mfRef = useRef(null);
 
   // Sync external latex value into the math-field without triggering our own
   // onChange handler (to avoid infinite loops).
@@ -179,6 +179,30 @@ function StepRow({
         </div>
       )}
 
+      {/* hint button */}
+      {!readonly && onHint && (
+        <button
+          type="button"
+          onClick={() => onHint(index)}
+          disabled={hintLoading}
+          style={{
+            background: hintLoading ? 'rgba(255,200,0,0.05)' : 'rgba(255,200,0,0.08)',
+            border: '1px solid rgba(255,200,0,0.3)',
+            borderRadius: '6px',
+            color: '#f0c040',
+            cursor: hintLoading ? 'default' : 'pointer',
+            fontSize: '0.65rem',
+            fontWeight: 800,
+            padding: '4px 8px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+          }}
+          title="Get AI hint for next step"
+        >
+          {hintLoading ? '...' : '💡 Hint'}
+        </button>
+      )}
+
       {/* remove button */}
       {!readonly && (
         <button
@@ -208,6 +232,28 @@ function StepRow({
   );
 }
 
+// ─── hint tooltip under a step ────────────────────────────────────────────
+function StepHintBox({ hint }) {
+  if (!hint) return null;
+  return (
+    <div
+      style={{
+        marginLeft: '56px',
+        marginBottom: '6px',
+        padding: '8px 12px',
+        background: 'rgba(255,200,0,0.06)',
+        border: '1px solid rgba(255,200,0,0.2)',
+        borderRadius: '6px',
+        fontSize: '0.78rem',
+        color: '#f0c040',
+        lineHeight: 1.5,
+      }}
+    >
+      <span style={{ fontWeight: 800, marginRight: '6px' }}>💡 Hint:</span>{hint}
+    </div>
+  );
+}
+
 // ─── feedback tooltip under a step ─────────────────────────────────────────
 function StepFeedback({ result }) {
   if (!result || result.valid) return null;
@@ -227,10 +273,12 @@ function StepFeedback({ result }) {
 }
 
 // ─── main editor ────────────────────────────────────────────────────────────
-export default function MathStepEditor({ steps, onChange, results, onInsertFromKeyboard, activeStepIndex, onActiveStepChange }) {
-  // dragState: { fromIndex, overIndex, overPos: 'above'|'below' } | null
+export default function MathStepEditor({ steps, onChange, results, onInsertFromKeyboard, activeStepIndex, onActiveStepChange, onStepHint, stepHints, loadingHintIndex }) {
   const [dragState, setDragState] = useState(null);
   const dragIndexRef = useRef(null);
+  const stepRefs = useRef([]);
+  // Keep the refs array in sync with the number of steps
+  stepRefs.current = steps.map((_, i) => stepRefs.current[i] ?? { current: null });
 
   const handleStepChange = useCallback((index, latex) => {
     const next = [...steps];
@@ -243,8 +291,7 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
     next.splice(index + 1, 0, '');
     onChange(next);
     setTimeout(() => {
-      const fields = document.querySelectorAll('math-field');
-      if (fields[index + 1]) fields[index + 1].focus();
+      stepRefs.current[index + 1]?.current?.focus();
     }, 50);
   }, [steps, onChange]);
 
@@ -254,16 +301,14 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
     onChange(next);
     const focusIdx = Math.min(index, next.length - 1);
     setTimeout(() => {
-      const fields = document.querySelectorAll('math-field');
-      if (fields[focusIdx]) fields[focusIdx].focus();
+      stepRefs.current[focusIdx]?.current?.focus();
     }, 50);
   }, [steps, onChange]);
 
   const handleAddStep = () => {
     onChange([...steps, '']);
     setTimeout(() => {
-      const fields = document.querySelectorAll('math-field');
-      if (fields[steps.length]) fields[steps.length].focus();
+      stepRefs.current[steps.length]?.current?.focus();
     }, 50);
   };
 
@@ -325,10 +370,10 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
     if (onInsertFromKeyboard) {
       onInsertFromKeyboard.current = (latex) => {
         const idx = activeStepIndex ?? 0;
-        const fields = document.querySelectorAll('math-field');
-        if (fields[idx]) {
-          fields[idx].focus();
-          fields[idx].executeCommand(['insert', latex]);
+        const mf = stepRefs.current[idx]?.current;
+        if (mf) {
+          mf.focus();
+          mf.insert(latex);
         }
       };
     }
@@ -346,6 +391,9 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
             onAddAfter={handleAddAfter}
             onFocus={onActiveStepChange}
             stepResult={results ? results[i] : undefined}
+            mfRef={stepRefs.current[i]}
+            onHint={onStepHint}
+            hintLoading={loadingHintIndex === i}
             isDragOver={
               dragState?.fromIndex === i ? 'dragging' :
               dragState?.overIndex === i ? 'over' : null
@@ -358,6 +406,7 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
             onDragEnd={handleDragEnd}
           />
           <StepFeedback result={results ? results[i] : null} />
+          <StepHintBox hint={stepHints ? stepHints[i] : null} />
         </div>
       ))}
 

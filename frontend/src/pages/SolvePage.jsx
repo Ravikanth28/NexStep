@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getHint as apiGetHint, getQuestion, validateSteps } from '../api';
+import { getHint as apiGetHint, getQuestion, getStepHint, validateSteps } from '../api';
 import MathKeyboard from '../components/MathKeyboard';
 import MathStepEditor from '../components/MathStepEditor';
 
@@ -29,6 +29,8 @@ export default function SolvePage() {
   const [validating, setValidating] = useState(false);
   const [hint, setHint] = useState('');
   const [hintLoading, setHintLoading] = useState(false);
+  const [stepHints, setStepHints] = useState({});
+  const [loadingHintIndex, setLoadingHintIndex] = useState(null);
   const [timer, setTimer] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -127,6 +129,22 @@ export default function SolvePage() {
     }
   };
 
+  const handleStepHint = async (stepIndex) => {
+    setLoadingHintIndex(stepIndex);
+    try {
+      const data = await getStepHint({
+        question_id: parseInt(id, 10),
+        step_index: stepIndex,
+        latex_steps: steps.filter((s) => s.trim()),
+      });
+      setStepHints((prev) => ({ ...prev, [stepIndex]: data.hint }));
+    } catch (err) {
+      setStepHints((prev) => ({ ...prev, [stepIndex]: 'Could not get hint right now.' }));
+    } finally {
+      setLoadingHintIndex(null);
+    }
+  };
+
   const handleReset = () => {
     if (!window.confirm('Delete all code and reset?')) return;
     setSteps(['']);
@@ -137,6 +155,7 @@ export default function SolvePage() {
     setQuestionAnalysis(null);
     setFeedback(null);
     setHint('');
+    setStepHints({});
     setSubmissionId(null);
     setSolutionSteps([]);
     setEvaluationMode('');
@@ -261,6 +280,9 @@ export default function SolvePage() {
                   onInsertFromKeyboard={insertFromKeyboardRef}
                   activeStepIndex={activeStepIndex}
                   onActiveStepChange={setActiveStepIndex}
+                  onStepHint={handleStepHint}
+                  stepHints={stepHints}
+                  loadingHintIndex={loadingHintIndex}
                 />
               </div>
 

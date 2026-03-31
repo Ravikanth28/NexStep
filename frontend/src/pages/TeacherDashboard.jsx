@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import 'mathlive';
+import MathKeyboard from '../components/MathKeyboard';
 import {
   analyzeQuestion,
   createQuestion,
@@ -54,6 +56,37 @@ export default function TeacherDashboard() {
   const [loadingAnswer, setLoadingAnswer] = useState(null);
   const [builderItems, setBuilderItems] = useState([]);
   const [customBuilderToken, setCustomBuilderToken] = useState('');
+
+  const mathFieldRef = useRef(null);
+
+  // Sync form.problem_expr → math-field when changed externally (builder, clear, etc.)
+  useEffect(() => {
+    const mf = mathFieldRef.current;
+    if (!mf) return;
+    if (mf.getValue('latex') !== form.problem_expr) {
+      mf.setValue(form.problem_expr, { suppressChangeNotifications: true });
+    }
+  }, [form.problem_expr]);
+
+  // Wire math-field input → form state once on mount
+  useEffect(() => {
+    const mf = mathFieldRef.current;
+    if (!mf) return;
+    const handleInput = () => {
+      const val = mf.getValue('latex');
+      setForm((current) => ({ ...current, problem_expr: val }));
+    };
+    mf.addEventListener('input', handleInput);
+    return () => mf.removeEventListener('input', handleInput);
+  }, []);
+
+  const handleInsertSymbol = (latex) => {
+    const mf = mathFieldRef.current;
+    if (mf) {
+      mf.insert(latex);
+      setForm((current) => ({ ...current, problem_expr: mf.getValue('latex') }));
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -246,9 +279,9 @@ export default function TeacherDashboard() {
       <div className="container">
         <section className="workspace-hero" style={{ padding: '60px', gridTemplateColumns: '1fr 420px', alignItems: 'center' }}>
           <div>
-            <div className="hero-kicker">Neural Control Matrix</div>
-            <h1 className="hero-title"><span className="text-gradient">AI Orchestration</span><br />& Global Sync.</h1>
-            <p className="hero-subtitle">Monitor neural parsing, classification, and student telemetry in real-time across all curriculum nodes.</p>
+            <div className="hero-kicker">Teacher Control Panel</div>
+            <h1 className="hero-title"><span className="text-gradient">Dashboard</span><br />&amp; Reports.</h1>
+            <p className="hero-subtitle">Monitor student submissions, question accuracy, and performance across all topics.</p>
             <div style={{ marginTop: '40px' }}>
               <button
                 className="btn btn-primary"
@@ -276,11 +309,11 @@ export default function TeacherDashboard() {
                 <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{dashboard?.overview.overall_accuracy || 0}%</div>
               </div>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>THROUGHPUT</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>TOTAL SUBMISSIONS</div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{dashboard?.overview.total_submissions || 0}</div>
               </div>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>VALIDATION</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>STATUS</div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-success)' }}>ACTIVE</div>
               </div>
             </div>
@@ -289,8 +322,8 @@ export default function TeacherDashboard() {
 
         <div className="tab-strip" style={{ marginBottom: '40px' }}>
           {[
-            ['dashboard', 'Analytics Layer'],
-            ['create', 'Curriculum Builder'],
+            ['dashboard', 'Dashboard'],
+            ['create', 'Add Question'],
             ['questions', 'Question Bank'],
           ].map(([key, label]) => (
             <button
@@ -328,15 +361,15 @@ export default function TeacherDashboard() {
               <main>
                 <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
                   <div style={{ padding: '32px 40px', borderBottom: '1px solid var(--border-main)' }}>
-                    <h3 className="card-title" style={{ margin: 0 }}>Student Network Status</h3>
+                    <h3 className="card-title" style={{ margin: 0 }}>Student Performance</h3>
                   </div>
                   <div style={{ padding: '32px 40px' }}>
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Identity</th>
-                          <th>Throughput</th>
-                          <th>Valid</th>
+                          <th>Student</th>
+                          <th>Total Submissions</th>
+                          <th>Correct</th>
                           <th>Accuracy</th>
                           <th>Avg Score</th>
                         </tr>
@@ -360,7 +393,7 @@ export default function TeacherDashboard() {
               <aside>
                 <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
                   <div style={{ padding: '32px 40px', borderBottom: '1px solid var(--border-main)' }}>
-                    <h3 className="card-title" style={{ margin: 0 }}>Live Transmission</h3>
+                    <h3 className="card-title" style={{ margin: 0 }}>Recent Submissions</h3>
                   </div>
                   <div style={{ padding: '32px 40px' }} className="scroll-column">
                     {dashboard.recent_submissions.slice(0, 15).map((submission) => (
@@ -384,8 +417,8 @@ export default function TeacherDashboard() {
         {tab === 'create' && (
           <div className="builder-grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 420px', gap: '40px' }}>
             <div className="card" style={{ padding: '40px' }}>
-              <div className="hero-kicker" style={{ fontSize: '0.65rem' }}>Question Assembly</div>
-              <h3 className="card-title" style={{ marginBottom: '32px' }}>Curriculum Builder</h3>
+              <div className="hero-kicker" style={{ fontSize: '0.65rem' }}>Add Question</div>
+              <h3 className="card-title" style={{ marginBottom: '32px' }}>Question Builder</h3>
               <form onSubmit={handleCreateQuestion}>
                 {formError && <div className="badge badge-hard" style={{ width: '100%', marginBottom: '24px', padding: '12px', textAlign: 'center' }}>{formError}</div>}
                 {formSuccess && <div className="badge badge-solved" style={{ width: '100%', marginBottom: '24px', padding: '12px', textAlign: 'center' }}>{formSuccess}</div>}
@@ -503,14 +536,26 @@ export default function TeacherDashboard() {
 
                 <div className="form-group" style={{ marginTop: '24px' }}>
                   <label>Raw Expression (Sympy Compatible)</label>
-                  <textarea
-                    value={form.problem_expr}
-                    onChange={(e) => updateField('problem_expr', e.target.value)}
-                    placeholder="e.g. solve(x**2 - 4, x)"
-                    required
-                    rows={5}
-                    style={{ fontFamily: "'JetBrains Mono', monospace", border: '1px solid var(--accent-primary)' }}
+                  <math-field
+                    ref={mathFieldRef}
+                    style={{
+                      width: '100%',
+                      display: 'block',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--accent-primary)',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      fontSize: '1.1rem',
+                      color: 'white',
+                      minHeight: '62px',
+                      '--caret-color': '#00e5be',
+                      '--selection-background-color': 'rgba(0,229,190,0.25)',
+                      '--text-font-family': 'JetBrains Mono',
+                    }}
                   />
+                  <div style={{ marginTop: '12px', border: '1px solid var(--border-main)', borderRadius: '12px', overflow: 'hidden' }}>
+                    <MathKeyboard onInsert={handleInsertSymbol} />
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
@@ -542,7 +587,7 @@ export default function TeacherDashboard() {
             <div style={{ display: 'grid', gap: '24px', alignContent: 'start' }}>
               <div className="card" style={{ padding: '32px', background: 'rgba(0,0,0,0.4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <div className="hero-kicker" style={{ fontSize: '0.65rem', margin: 0 }}>AI Routing Preview</div>
+                  <div className="hero-kicker" style={{ fontSize: '0.65rem', margin: 0 }}>AI Analysis Preview</div>
                   <div className={`badge ${analyzing ? 'badge-medium' : 'badge-solved'}`} style={{ fontSize: '0.6rem' }}>{analyzing ? 'Processing' : 'Active'}</div>
                 </div>
                 {analysis ? (

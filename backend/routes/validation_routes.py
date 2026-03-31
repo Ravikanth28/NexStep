@@ -23,6 +23,10 @@ _LATEX_REPLACEMENTS = [
     # Absolute value: \left|x\right| → |x|
     (_re.compile(r'\\left\s*\|'), '|'),
     (_re.compile(r'\\right\s*\|'), '|'),
+    # Evaluated bracket [F(x)]_a^b  → F(b) - F(a) representation stripped to inner expr
+    # We just unwrap the inner expression so SymPy can parse it as a valid expr
+    (_re.compile(r'\\left\[(.+?)\\right\]_\{([^}]*)\}\^\{([^}]*)\}'), r'(\1)'),
+    (_re.compile(r'\\left\[(.+?)\\right\]'), r'(\1)'),
     # Arrows (used as "therefore" / implication steps) – strip them cleanly
     (_re.compile(r'\\(to|rightarrow|Rightarrow|longrightarrow|Longrightarrow)\b'), ''),
     # \, \; \! thin spaces – remove
@@ -223,6 +227,44 @@ async def get_hint_for_question(
         raise HTTPException(status_code=404, detail="Question not found")
 
     hint = get_hint(question.problem_expr, req.step_number)
+    return {"hint": hint}
+
+
+class StepHintRequest(BaseModel):
+    question_id: int
+    step_index: int        # 0-based index of the step the student wants a hint for
+    latex_steps: list[str] # all steps entered so far (LaTeX)
+
+
+@router.post("/step-hint")
+async def get_step_hint(
+    req: StepHintRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user)
+):
+    question = db.query(Question).filter(Question.id == req.question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    # Convert submitted steps to readable strings
+    steps_text = [_latex_to_sympy_str(s) for s in req.latex_steps if s.strip()]
+    current_step = steps_text[req.step_index] if req.step_index < len(steps_text) else ""
+
+    from ai_engine import get_ai_response
+    system_prompt = (
+        "You are a helpful mathematics tutor. "
+        "Given a problem and the student's work so far, suggest a short, clear hint for what the next step should be. "
+        "Do NOT give the full answer. Give only a one or two sentence guiding hint. Be encouraging."
+    )
+    steps_summary = "\n".join(f"Step {i+1}: {s}" for i, s in enumerate(steps_text))
+    user_prompt = (
+        f"Problem: {question.problem_expr}\n"
+        f"Student's steps so far:\n{steps_summary if steps_summary else '(none yet)'}\n"
+        f"The student is currently on step {req.step_index + 1}. "
+        "What should their next step be? Give a short hint only."
+    )
+
+    hint = await get_ai_response(user_prompt, system_prompt)
     return {"hint": hint}
 
 
