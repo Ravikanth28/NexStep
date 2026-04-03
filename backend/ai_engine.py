@@ -5,57 +5,68 @@ import logging
 from typing import Optional, Dict, Any, List
 import httpx
 from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # API Configurations
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+NVIDIA_API_KEYS_STR = os.getenv("NVIDIA_API_KEYS", "")
+NVIDIA_API_KEYS = [k.strip() for k in NVIDIA_API_KEYS_STR.split(",") if k.strip()]
+if not NVIDIA_API_KEYS:
+    single_key = os.getenv("NVIDIA_API_KEY", "")
+    if single_key:
+        NVIDIA_API_KEYS.append(single_key)
+
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
 
-# Initialize NVIDIA client
-nvidia_client = OpenAI(
-    base_url="https://integrate.api.nvidia.com/v1",
-    api_key=NVIDIA_API_KEY,
-) if NVIDIA_API_KEY else None
 
 def _call_nvidia_sync(prompt: str, system_instruction: str = "") -> Optional[str]:
     """Call NVIDIA NIM chat completions and combine streamed output."""
-    if not nvidia_client:
+    if not NVIDIA_API_KEYS:
         return None
 
-    try:
-        messages = []
-        if system_instruction.strip():
-            messages.append({"role": "system", "content": system_instruction})
-        messages.append({"role": "user", "content": prompt})
+    messages = []
+    if system_instruction.strip():
+        messages.append({"role": "system", "content": system_instruction})
+    messages.append({"role": "user", "content": prompt})
 
-        completion = nvidia_client.chat.completions.create(
-            model="nvidia/nemotron-3-nano-30b-a3b",
-            messages=messages,
-            temperature=1,
-            top_p=1,
-            max_tokens=16384,
-            extra_body={
-                "reasoning_budget": 16384,
-                "chat_template_kwargs": {"enable_thinking": True},
-            },
-            stream=True,
-        )
+    for key in NVIDIA_API_KEYS:
+        try:
+            client = OpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=key,
+            )
+            completion = client.chat.completions.create(
+                model="nvidia/nemotron-3-nano-30b-a3b",
+                messages=messages,
+                temperature=1,
+                top_p=1,
+                max_tokens=16384,
+                extra_body={
+                    "reasoning_budget": 16384,
+                    "chat_template_kwargs": {"enable_thinking": True},
+                },
+                stream=True,
+            )
 
-        content_parts: list[str] = []
-        for chunk in completion:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            if delta.content is not None:
-                content_parts.append(delta.content)
+            content_parts: list[str] = []
+            for chunk in completion:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta.content is not None:
+                    content_parts.append(delta.content)
 
-        return "".join(content_parts).strip() or None
-    except Exception as e:
-        logger.error(f"NVIDIA API Error: {e}")
-        return None
+            return "".join(content_parts).strip() or None
+        except Exception as e:
+            logger.error(f"NVIDIA API Error with key {key[:8]}...: {e}")
+            continue
+
+    return None
 
 async def call_nvidia(prompt: str, system_instruction: str = "") -> Optional[str]:
     return await asyncio.to_thread(_call_nvidia_sync, prompt, system_instruction)
