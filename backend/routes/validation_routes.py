@@ -296,6 +296,10 @@ async def get_step_hint(
     )
 
     hint = await get_ai_response(user_prompt, system_prompt)
+    if hint.startswith("Error: All AI systems"):
+        from validation_engine import get_hint as get_local_hint
+        hint = get_local_hint(question.problem_expr, req.step_index)
+        
     return {"hint": hint}
 
 

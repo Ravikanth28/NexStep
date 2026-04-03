@@ -20,6 +20,13 @@ async function request(url, options = {}) {
   });
   const data = await res.json();
   if (!res.ok) {
+    // If token expired or invalid, clear it and redirect to login
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please log in again.');
+    }
     throw new Error(data.detail || 'Request failed');
   }
   return data;

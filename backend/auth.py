@@ -6,7 +6,7 @@ import jwt
 
 SECRET_KEY = "integral-calculus-platform-secret-key-2024"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24
+ACCESS_TOKEN_EXPIRE_HOURS = 168  # 7 days
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

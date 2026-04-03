@@ -2775,6 +2775,43 @@ def build_learning_feedback(validation_result: dict, topic: str = "", strategy: 
 def get_hint(problem_expr_str: str, step_number: int = 0) -> str:
     """Generate a hint for the given problem."""
     lowered_problem = (problem_expr_str or "").lower()
+
+    # Fourier coefficient questions: find a0, an, bn for x^2 on [0, 2pi]
+    if "find a0" in lowered_problem and "fourier" in lowered_problem:
+        hints = [
+            "Write the formula: a0 = (1/pi) * integral from 0 to 2pi of f(x) dx.",
+            "Substitute f(x) = x^2 and find the antiderivative x^3/3.",
+            "Evaluate [x^3/3] from 0 to 2pi to get 8pi^3/3.",
+            "Multiply by 1/pi to get the final answer: a0 = 8pi^2/3.",
+        ]
+        if step_number < len(hints):
+            return hints[step_number]
+        return hints[-1]
+
+    if "find an" in lowered_problem and "fourier" in lowered_problem:
+        hints = [
+            "Write the formula: an = (1/pi) * integral from 0 to 2pi of f(x)cos(nx) dx.",
+            "Substitute f(x) = x^2 to get the integral of x^2 cos(nx) dx.",
+            "Use integration by parts twice to evaluate the integral.",
+            "Apply boundary values: sin(2n*pi) = 0 and cos(2n*pi) = 1.",
+            "The final answer is an = 4/n^2.",
+        ]
+        if step_number < len(hints):
+            return hints[step_number]
+        return hints[-1]
+
+    if "find bn" in lowered_problem and "fourier" in lowered_problem:
+        hints = [
+            "Write the formula: bn = (1/pi) * integral from 0 to 2pi of f(x)sin(nx) dx.",
+            "Substitute f(x) = x^2 to get the integral of x^2 sin(nx) dx.",
+            "Use integration by parts twice to evaluate the integral.",
+            "Apply boundary values: sin(2n*pi) = 0 and cos(2n*pi) = 1.",
+            "The final answer is bn = -4pi/n.",
+        ]
+        if step_number < len(hints):
+            return hints[step_number]
+        return hints[-1]
+
     if "fourier series" in lowered_problem and ("f(x)=x" in lowered_problem.replace(" ", "") or "f(x) = x" in lowered_problem):
         hints = [
             "Check whether f(x)=x is odd or even on (-pi, pi).",
