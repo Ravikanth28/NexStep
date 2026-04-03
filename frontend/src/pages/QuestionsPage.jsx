@@ -205,6 +205,13 @@ export default function QuestionsPage() {
                       <div className="problem">
                         {question.problem_expr}
                       </div>
+                      {question.problem_image && (
+                        <img
+                          src={question.problem_image}
+                          alt="Expression"
+                          style={{ marginTop: '12px', maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid var(--border-main)', objectFit: 'contain', display: 'block' }}
+                        />
+                      )}
 
                       <div className="chip-wrap" style={{ marginTop: '24px' }}>
                         <div className="soft-pill">{question.topic}</div>

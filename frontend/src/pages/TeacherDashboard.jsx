@@ -10,6 +10,7 @@ import {
   getQuestions,
   getSyllabusMeta,
   getTeacherDashboard,
+  parseExpressionImage,
 } from '../api';
 
 const BUILDER_LIBRARY = [
@@ -30,6 +31,7 @@ const BUILDER_LIBRARY = [
 const DEFAULT_FORM = {
   title: '',
   problem_expr: '',
+  problem_image: null,
   difficulty: '',
   topic: '',
   subject: '',
@@ -56,10 +58,9 @@ export default function TeacherDashboard() {
   const [loadingAnswer, setLoadingAnswer] = useState(null);
   const [builderItems, setBuilderItems] = useState([]);
   const [customBuilderToken, setCustomBuilderToken] = useState('');
-
+  const [imageParseLoading, setImageParseLoading] = useState(false);
+  const imageInputRef = useRef(null);
   const mathFieldRef = useRef(null);
-
-  // Sync form.problem_expr → math-field when changed externally (builder, clear, etc.)
   useEffect(() => {
     const mf = mathFieldRef.current;
     if (!mf) return;
@@ -184,6 +185,37 @@ export default function TeacherDashboard() {
     updateField('problem_expr', '');
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const b64 = ev.target.result; // data:image/...;base64,<data>
+      updateField('problem_image', b64);
+    };
+    reader.readAsDataURL(file);
+    // reset so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const handleParseImageExpr = async () => {
+    if (!form.problem_image) return;
+    setImageParseLoading(true);
+    try {
+      const raw = form.problem_image.split(',')[1] ?? form.problem_image;
+      const result = await parseExpressionImage(raw);
+      if (result.expression) {
+        updateField('problem_expr', result.expression);
+      } else {
+        setFormError(result.error || 'Could not extract expression from image.');
+      }
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setImageParseLoading(false);
+    }
+  };
+
   const addCustomBuilderToken = () => {
     const value = customBuilderToken.trim();
     if (!value) return;
@@ -227,8 +259,7 @@ export default function TeacherDashboard() {
       setForm(DEFAULT_FORM);
       setAnalysis(null);
       setBuilderItems([]);
-      setCustomBuilderToken('');
-      await loadData();
+      setCustomBuilderToken('');      await loadData();
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -558,6 +589,65 @@ export default function TeacherDashboard() {
                   </div>
                 </div>
 
+                {/* Image upload for expression */}
+                <div style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--border-main)', borderRadius: '14px', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '14px' }}>
+                    EXPRESSION IMAGE (Optional)
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleImageUpload}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => imageInputRef.current?.click()}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      Upload Image
+                    </button>
+                    {form.problem_image && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={handleParseImageExpr}
+                          disabled={imageParseLoading}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          {imageParseLoading ? <div className="spinner" style={{ width: 16, height: 16 }}></div> : 'Parse Expression from Image'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => updateField('problem_image', null)}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          Remove Image
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {form.problem_image && (
+                    <div style={{ marginTop: '16px' }}>
+                      <img
+                        src={form.problem_image}
+                        alt="Expression"
+                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '10px', border: '1px solid var(--border-main)', objectFit: 'contain' }}
+                      />
+                    </div>
+                  )}
+                  {!form.problem_image && (
+                    <p style={{ margin: '12px 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      Upload an image of the expression. Click "Parse Expression from Image" to auto-fill the expression field via AI.
+                    </p>
+                  )}
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
                   <div className="form-group">
                     <label>Intelligence Topic</label>
@@ -632,6 +722,13 @@ export default function TeacherDashboard() {
                       <div className={`badge badge-${question.difficulty}`}>{question.difficulty}</div>
                     </div>
                     <div className="problem">{question.problem_expr}</div>
+                    {question.problem_image && (
+                      <img
+                        src={question.problem_image}
+                        alt="Expression"
+                        style={{ marginTop: '12px', maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid var(--border-main)', objectFit: 'contain' }}
+                      />
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', gap: '12px', flexWrap: 'wrap' }}>
                       <button
                         className="btn btn-outline"

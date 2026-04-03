@@ -1291,6 +1291,299 @@ def validate_fourier_series_steps(steps: list[str], problem_expr_str: str) -> di
     }
 
 
+def _fourier_coeff_check(step_text: str, expected_expr, label: str) -> dict | None:
+    """Try to parse step_text and check if it equals expected_expr symbolically."""
+    parsed = parse_expression_candidate(step_text)
+    if parsed is not None and expressions_equal(parsed, expected_expr):
+        return {"valid": True, "error": f"Correct {label}."}
+    return None
+
+
+def validate_fourier_a0_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Strict step-by-step validator for finding a0 of f(x)=x^2 on [0, 2pi].
+
+    Expected steps (from reference):
+      1. a0 = (1/pi) * integral(0 to 2pi) f(x) dx         — formula
+      2. = (1/pi) * integral(0 to 2pi) x^2 dx = (1/pi)[x^3/3]_0^{2pi}  — antiderivative
+      3. = (1/pi) * [8pi^3/3 - 0]                          — evaluate limits
+      4. a0 = 8pi^2/3                                       — final answer
+    """
+    results = []
+    all_valid = True
+    total_marks = 4  # 4 steps max
+
+    # Expected intermediate values
+    antideriv_result = 8 * pi**3 / 3      # [x^3/3] from 0 to 2pi
+    final_answer = 8 * pi**2 / 3          # (1/pi) * 8pi^3/3
+
+    for idx, step_text in enumerate(steps):
+        raw = step_text.strip()
+        lowered = raw.lower().replace(" ", "")
+        valid = False
+        message = None
+
+        # Step 1: Formula setup — a0 = (1/pi) * integral f(x) dx
+        if idx == 0:
+            if ("a0" in lowered or "a_0" in lowered) and ("1/pi" in lowered or "1/π" in lowered) and ("integral" in lowered or "∫" in raw or "int" in lowered):
+                valid = True
+                message = "Correct: a₀ formula setup."
+            elif "a0" in lowered and "f(x)" in lowered:
+                valid = True
+                message = "Correct: a₀ formula setup."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and expressions_equal(parsed, final_answer):
+                    valid = True
+                    message = "Correct a₀ value (but show the formula first for full marks)."
+
+        # Step 2: Substitute f(x)=x^2, antiderivative x^3/3
+        elif idx == 1:
+            if ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and ("x^3/3" in lowered or "x**3/3" in lowered or "x³/3" in lowered):
+                valid = True
+                message = "Correct: substituted f(x)=x² and found antiderivative x³/3."
+            elif "x^2" in lowered or "x**2" in lowered:
+                valid = True
+                message = "Correct: substituted f(x) = x²."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and (expressions_equal(parsed, antideriv_result) or expressions_equal(parsed, final_answer)):
+                    valid = True
+                    message = "Correct intermediate value."
+
+        # Step 3: Evaluate limits — (1/pi)[8pi^3/3 - 0]
+        elif idx == 2:
+            if ("8pi^3/3" in lowered or "8*pi**3/3" in lowered or "8π³/3" in lowered or "8pi³/3" in lowered):
+                valid = True
+                message = "Correct: evaluated [x³/3] at limits 0 and 2π."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and (expressions_equal(parsed, antideriv_result) or expressions_equal(parsed, antideriv_result / pi) or expressions_equal(parsed, final_answer)):
+                    valid = True
+                    message = "Correct limit evaluation."
+
+        # Step 4: Final answer — a0 = 8pi^2/3
+        elif idx == 3:
+            parsed = parse_expression_candidate(raw)
+            if parsed is not None and expressions_equal(parsed, final_answer):
+                valid = True
+                message = "Correct: a₀ = 8π²/3. ✓"
+            elif "8pi^2/3" in lowered or "8*pi**2/3" in lowered or "8π²/3" in lowered:
+                valid = True
+                message = "Correct: a₀ = 8π²/3. ✓"
+
+        # Extra steps beyond expected 4
+        else:
+            parsed = parse_expression_candidate(raw)
+            if parsed is not None and expressions_equal(parsed, final_answer):
+                valid = True
+                message = "Correct final value repeated."
+
+        if not valid:
+            all_valid = False
+        results.append({
+            "step": idx + 1,
+            "expression": step_text,
+            "valid": valid,
+            "error": message or f"Step {idx+1} does not match expected derivation for a₀.",
+        })
+
+    return {
+        "steps": results,
+        "verdict": "Correct" if all_valid and results else "Incorrect",
+        "correct_answer": "a₀ = 8π²/3",
+    }
+
+
+def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Strict step-by-step validator for finding an of f(x)=x^2 on [0, 2pi].
+
+    Expected steps (from reference):
+      1. an = (1/pi) * integral(0 to 2pi) f(x)cos(nx) dx      — formula
+      2. = (1/pi) * integral(0 to 2pi) x^2 cos(nx) dx          — substitution
+      3. = (1/pi)[x^2*sin(nx)/n - 2x*(-cos(nx))/n^2 + 2*(-sin(nx))/n^3]_0^{2pi}  — IBP
+      4. = (1/pi)[0 + 4pi/n^2 + 0] = 4/n^2                    — evaluate
+      5. an = 4/n^2                                              — final
+    """
+    results = []
+    all_valid = True
+    final_answer = 4 / n**2
+
+    for idx, step_text in enumerate(steps):
+        raw = step_text.strip()
+        lowered = raw.lower().replace(" ", "")
+        valid = False
+        message = None
+
+        # Step 1: Formula — an = (1/pi) integral f(x) cos(nx) dx
+        if idx == 0:
+            if ("an" in lowered or "a_n" in lowered) and ("cos" in lowered) and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered or "∫" in raw):
+                valid = True
+                message = "Correct: aₙ formula setup with cos(nx)."
+            elif ("an" in lowered or "a_n" in lowered) and "f(x)" in lowered and "cos" in lowered:
+                valid = True
+                message = "Correct: aₙ formula setup."
+
+        # Step 2: Substitute x^2 cos(nx)
+        elif idx == 1:
+            if ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and "cos" in lowered:
+                valid = True
+                message = "Correct: substituted f(x) = x² into the integral."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and expressions_equal(parsed, final_answer):
+                    valid = True
+                    message = "Correct aₙ value."
+
+        # Step 3: Integration by parts result
+        elif idx == 2:
+            if ("sin(n" in lowered or "sin(nx)" in lowered) and ("cos(n" in lowered or "cos(nx)" in lowered) and ("/n" in lowered):
+                valid = True
+                message = "Correct: integration by parts result for ∫x²cos(nx)dx."
+            elif "sin" in lowered and "cos" in lowered and "n^2" in lowered:
+                valid = True
+                message = "Correct: IBP expansion shown."
+
+        # Step 4: Evaluate at limits → 4/n^2
+        elif idx == 3:
+            if ("4pi/n^2" in lowered or "4*pi/n**2" in lowered or "4π/n²" in lowered):
+                valid = True
+                message = "Correct: evaluated boundary terms."
+            elif "4/n^2" in lowered or "4/n²" in lowered or "4/n**2" in lowered:
+                valid = True
+                message = "Correct: simplified to 4/n²."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and expressions_equal(parsed, final_answer):
+                    valid = True
+                    message = "Correct evaluation step."
+
+        # Step 5: Final answer an = 4/n^2
+        elif idx == 4:
+            parsed = parse_expression_candidate(raw)
+            if parsed is not None and expressions_equal(parsed, final_answer):
+                valid = True
+                message = "Correct: aₙ = 4/n². ✓"
+            elif "4/n^2" in lowered or "4/n²" in lowered or "4/n**2" in lowered:
+                valid = True
+                message = "Correct: aₙ = 4/n². ✓"
+
+        else:
+            parsed = parse_expression_candidate(raw)
+            if parsed is not None and expressions_equal(parsed, final_answer):
+                valid = True
+                message = "Correct final value repeated."
+
+        if not valid:
+            all_valid = False
+        results.append({
+            "step": idx + 1,
+            "expression": step_text,
+            "valid": valid,
+            "error": message or f"Step {idx+1} does not match expected derivation for aₙ.",
+        })
+
+    return {
+        "steps": results,
+        "verdict": "Correct" if all_valid and results else "Incorrect",
+        "correct_answer": "aₙ = 4/n²",
+    }
+
+
+def validate_fourier_bn_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Strict step-by-step validator for finding bn of f(x)=x^2 on [0, 2pi].
+
+    Expected steps (from reference):
+      1. bn = (1/pi) * integral(0 to 2pi) f(x)sin(nx) dx       — formula
+      2. = (1/pi) * integral(0 to 2pi) x^2 sin(nx) dx           — substitution
+      3. = (1/pi)[x^2*(-cos(nx))/n - 2x*(-sin(nx))/n^2 + 2*(cos(nx))/n^3]_0^{2pi}  — IBP
+      4. = (1/pi)[-4pi^2/n - 0 + 2/n^3 - 0 - 0 - 2/n^3] = -4pi/n  — evaluate
+      5. bn = -4pi/n                                              — final
+    """
+    results = []
+    all_valid = True
+    final_answer = -4 * pi / n
+
+    for idx, step_text in enumerate(steps):
+        raw = step_text.strip()
+        lowered = raw.lower().replace(" ", "")
+        valid = False
+        message = None
+
+        # Step 1: Formula — bn = (1/pi) integral f(x) sin(nx) dx
+        if idx == 0:
+            if ("bn" in lowered or "b_n" in lowered) and ("sin" in lowered) and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered or "∫" in raw):
+                valid = True
+                message = "Correct: bₙ formula setup with sin(nx)."
+            elif ("bn" in lowered or "b_n" in lowered) and "f(x)" in lowered and "sin" in lowered:
+                valid = True
+                message = "Correct: bₙ formula setup."
+
+        # Step 2: Substitute x^2 sin(nx)
+        elif idx == 1:
+            if ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and "sin" in lowered:
+                valid = True
+                message = "Correct: substituted f(x) = x² into the sine integral."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and expressions_equal(parsed, final_answer):
+                    valid = True
+                    message = "Correct bₙ value."
+
+        # Step 3: Integration by parts result
+        elif idx == 2:
+            if ("cos(n" in lowered or "cos(nx)" in lowered) and ("sin(n" in lowered or "sin(nx)" in lowered) and ("/n" in lowered):
+                valid = True
+                message = "Correct: integration by parts result for ∫x²sin(nx)dx."
+            elif "cos" in lowered and "sin" in lowered and "n^2" in lowered:
+                valid = True
+                message = "Correct: IBP expansion shown."
+
+        # Step 4: Evaluate at limits → -4pi/n
+        elif idx == 3:
+            if ("-4pi^2/n" in lowered or "-4*pi**2/n" in lowered or "-4π²/n" in lowered):
+                valid = True
+                message = "Correct: evaluated boundary terms."
+            elif ("-4pi/n" in lowered or "-4*pi/n" in lowered or "-4π/n" in lowered):
+                valid = True
+                message = "Correct: simplified to -4π/n."
+            else:
+                parsed = parse_expression_candidate(raw)
+                if parsed is not None and expressions_equal(parsed, final_answer):
+                    valid = True
+                    message = "Correct evaluation step."
+
+        # Step 5: Final answer bn = -4pi/n
+        elif idx == 4:
+            parsed = parse_expression_candidate(raw)
+            if parsed is not None and expressions_equal(parsed, final_answer):
+                valid = True
+                message = "Correct: bₙ = -4π/n. ✓"
+            elif "-4pi/n" in lowered or "-4*pi/n" in lowered or "-4π/n" in lowered:
+                valid = True
+                message = "Correct: bₙ = -4π/n. ✓"
+
+        else:
+            parsed = parse_expression_candidate(raw)
+            if parsed is not None and expressions_equal(parsed, final_answer):
+                valid = True
+                message = "Correct final value repeated."
+
+        if not valid:
+            all_valid = False
+        results.append({
+            "step": idx + 1,
+            "expression": step_text,
+            "valid": valid,
+            "error": message or f"Step {idx+1} does not match expected derivation for bₙ.",
+        })
+
+    return {
+        "steps": results,
+        "verdict": "Correct" if all_valid and results else "Incorrect",
+        "correct_answer": "bₙ = -4π/n",
+    }
+
+
 def validate_laplace_family_steps(steps: list[str], problem_expr_str: str) -> dict:
     """Validation for Laplace, inverse Laplace, Fourier transform, and Z-transform style answers."""
     # 1. Try direct SymPy parsing (e.g. laplace_transform(exp(3*x), x, s)[0])
@@ -2066,6 +2359,13 @@ def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = 
         return validate_matrix_steps(steps, problem_expr_str)
     if resolved_type == "matrix":
         return validate_matrix_steps(steps, problem_expr_str)
+    # Fourier coefficient sub-types: each question finds one coefficient
+    if problem_type == "fourier_a0":
+        return validate_fourier_a0_steps(steps, problem_expr_str)
+    if problem_type == "fourier_an":
+        return validate_fourier_an_steps(steps, problem_expr_str)
+    if problem_type == "fourier_bn":
+        return validate_fourier_bn_steps(steps, problem_expr_str)
     if resolved_type == "series":
         return validate_fourier_series_steps(steps, problem_expr_str)
     if resolved_type == "transform":
@@ -2139,6 +2439,14 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
                 return None
             antideriv = integrate(f_expr, x)
             return f"y = {format_expression(antideriv)} + C"
+
+
+        if resolved in ("fourier_a0", "fourier_an", "fourier_bn"):
+            if resolved == "fourier_a0":
+                return "a₀ = 8π²/3"
+            if resolved == "fourier_an":
+                return "aₙ = 4/n²"
+            return "bₙ = -4π/n"
 
         if resolved == "series":
             if structured_expr is not None and structured.get("interval") == ("-pi", "pi"):
@@ -2300,6 +2608,48 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
                     {"step": 3, "title": "Simplify in s-domain",
                      "detail": f"F(s) = {format_expression(correct)}" if correct else "Evaluate"},
                 ]
+
+
+        # ── FOURIER COEFFICIENTS (a₀, aₙ, bₙ for x² on [0, 2π]) ──────────
+        elif resolved == "fourier_a0":
+            steps = [
+                {"step": 1, "title": "Write the a₀ formula",
+                 "detail": "a₀ = (1/π) ∫₀²π f(x) dx"},
+                {"step": 2, "title": "Substitute f(x) = x² and find antiderivative",
+                 "detail": "= (1/π) ∫₀²π x² dx = (1/π)[x³/3]₀²π"},
+                {"step": 3, "title": "Evaluate at limits",
+                 "detail": "= (1/π)[8π³/3 − 0]"},
+                {"step": 4, "title": "Simplify",
+                 "detail": "a₀ = 8π²/3"},
+            ]
+
+        elif resolved == "fourier_an":
+            steps = [
+                {"step": 1, "title": "Write the aₙ formula",
+                 "detail": "aₙ = (1/π) ∫₀²π f(x)cos(nx) dx"},
+                {"step": 2, "title": "Substitute f(x) = x²",
+                 "detail": "= (1/π) ∫₀²π x² cos(nx) dx"},
+                {"step": 3, "title": "Integration by parts",
+                 "detail": "= (1/π)[x²·sin(nx)/n − 2x·(−cos(nx))/n² + 2·(−sin(nx))/n³]₀²π"},
+                {"step": 4, "title": "Evaluate boundary terms",
+                 "detail": "= (1/π)[0 + 4π/n² + 0] = 4/n²"},
+                {"step": 5, "title": "Final answer",
+                 "detail": "aₙ = 4/n²"},
+            ]
+
+        elif resolved == "fourier_bn":
+            steps = [
+                {"step": 1, "title": "Write the bₙ formula",
+                 "detail": "bₙ = (1/π) ∫₀²π f(x)sin(nx) dx"},
+                {"step": 2, "title": "Substitute f(x) = x²",
+                 "detail": "= (1/π) ∫₀²π x² sin(nx) dx"},
+                {"step": 3, "title": "Integration by parts",
+                 "detail": "= (1/π)[x²·(−cos(nx))/n − 2x·(−sin(nx))/n² + 2·(cos(nx))/n³]₀²π"},
+                {"step": 4, "title": "Evaluate boundary terms",
+                 "detail": "= (1/π)[−4π²/n − 0 + 2/n³ − 0 − 0 − 2/n³] = −4π/n"},
+                {"step": 5, "title": "Final answer",
+                 "detail": "bₙ = −4π/n"},
+            ]
 
         # ── FOURIER SERIES ────────────────────────────────────────────────────
         elif resolved == "series":

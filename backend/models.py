@@ -36,6 +36,7 @@ class Question(Base):
     analysis_confidence = Column(Float, default=0.0)
     hints = Column(Text, default="[]")  # JSON array of hints
     allow_copy_paste = Column(Boolean, default=True)
+    problem_image = Column(Text, nullable=True)  # base64 image of the expression (optional)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

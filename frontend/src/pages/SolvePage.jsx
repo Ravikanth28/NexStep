@@ -4,6 +4,13 @@ import { getHint as apiGetHint, getQuestion, getStepHint, validateSteps } from '
 import 'mathlive';
 import MathKeyboard from '../components/MathKeyboard';
 import MathStepEditor from '../components/MathStepEditor';
+import {
+  buildExplanationScript,
+  speak,
+  stopSpeech,
+  pauseSpeech,
+  resumeSpeech,
+} from '../utils/mathSpeech';
 
 function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60);
@@ -37,6 +44,10 @@ export default function SolvePage() {
   const [timer, setTimer] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
+  const [speechPaused, setSpeechPaused] = useState(false);
+  const [speechReady, setSpeechReady] = useState(false);
+  const speechScriptRef = useRef('');
   const insertFromKeyboardRef = useRef(null);
 
   useEffect(() => {
@@ -50,6 +61,63 @@ export default function SolvePage() {
     }
     return () => clearInterval(interval);
   }, [timerActive]);
+
+  // Auto-play audio explanation when validation results arrive
+  useEffect(() => {
+    if (!verdict || !question) return;
+    const script = buildExplanationScript({
+      questionTitle: question.title,
+      problemExpr: question.problem_expr,
+      verdict,
+      correctAnswer,
+      solutionSteps,
+      overallFeedback,
+      results,
+      feedback,
+    });
+    speechScriptRef.current = script;
+    setSpeechReady(true);
+    setSpeaking(true);
+    setSpeechPaused(false);
+    speak(script, {
+      onStart: () => { setSpeaking(true); setSpeechPaused(false); },
+      onEnd: () => { setSpeaking(false); setSpeechPaused(false); },
+      onError: () => { setSpeaking(false); setSpeechPaused(false); },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verdict]);
+
+  // Stop speech when component unmounts or user navigates away
+  useEffect(() => {
+    return () => stopSpeech();
+  }, []);
+
+  const handleSpeechPlay = () => {
+    if (speechPaused) {
+      resumeSpeech();
+      setSpeaking(true);
+      setSpeechPaused(false);
+    } else if (!speaking && speechScriptRef.current) {
+      setSpeaking(true);
+      speak(speechScriptRef.current, {
+        onStart: () => { setSpeaking(true); setSpeechPaused(false); },
+        onEnd: () => { setSpeaking(false); setSpeechPaused(false); },
+        onError: () => { setSpeaking(false); setSpeechPaused(false); },
+      });
+    }
+  };
+
+  const handleSpeechPause = () => {
+    pauseSpeech();
+    setSpeaking(false);
+    setSpeechPaused(true);
+  };
+
+  const handleSpeechStop = () => {
+    stopSpeech();
+    setSpeaking(false);
+    setSpeechPaused(false);
+  };
 
   const loadQuestion = async () => {
     setLoading(true);
@@ -161,6 +229,9 @@ export default function SolvePage() {
 
   const handleReset = () => {
     if (!window.confirm('Delete all code and reset?')) return;
+    handleSpeechStop();
+    setSpeechReady(false);
+    speechScriptRef.current = '';
     setSteps(['']);
     setResults(null);
     setVerdict(null);
@@ -242,6 +313,13 @@ export default function SolvePage() {
                 read-only
                 style={{ fontSize: '1.4rem', background: 'transparent', color: 'inherit', border: 'none', width: '100%' }}
               >{question.problem_expr}</math-field>
+              {question.problem_image && (
+                <img
+                  src={question.problem_image}
+                  alt="Expression"
+                  style={{ marginTop: '16px', maxWidth: '100%', maxHeight: '180px', borderRadius: '10px', objectFit: 'contain', display: 'block' }}
+                />
+              )}
             </div>
           </div>
 
@@ -406,6 +484,68 @@ export default function SolvePage() {
                 </div>
               ) : (
                 <div className="telemetry-stack">
+
+                  {/* ── Audio Explanation Panel ── */}
+                  {speechReady && (
+                    <div className="telemetry-card" style={{
+                      borderColor: speaking ? 'var(--accent-primary)' : speechPaused ? '#f0c040' : 'var(--border-main)',
+                      background: speaking ? 'rgba(0,242,255,0.04)' : 'rgba(255,255,255,0.02)',
+                      transition: 'border-color 0.3s',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div>
+                          <div className="telemetry-card-label" style={{ color: speaking ? 'var(--accent-primary)' : speechPaused ? '#f0c040' : 'var(--text-muted)' }}>
+                            Audio Explanation
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            {speaking ? 'Playing solution walkthrough…' : speechPaused ? 'Paused' : 'Ready to replay'}
+                          </div>
+                        </div>
+                        {/* Animated waveform when speaking */}
+                        {speaking && (
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '20px' }}>
+                            {[1, 2, 3, 4, 3, 2].map((h, i) => (
+                              <div key={i} style={{
+                                width: '3px',
+                                height: `${h * 4}px`,
+                                background: 'var(--accent-primary)',
+                                borderRadius: '2px',
+                                animation: `audioBar 0.8s ease-in-out ${i * 0.1}s infinite alternate`,
+                              }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {speaking ? (
+                          <button
+                            className="btn btn-outline"
+                            style={{ flex: 1, justifyContent: 'center', padding: '8px 12px', fontSize: '0.8rem', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+                            onClick={handleSpeechPause}
+                          >
+                            ⏸ Pause
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-outline"
+                            style={{ flex: 1, justifyContent: 'center', padding: '8px 12px', fontSize: '0.8rem', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+                            onClick={handleSpeechPlay}
+                          >
+                            ▶ {speechPaused ? 'Resume' : 'Replay'}
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                          onClick={handleSpeechStop}
+                          disabled={!speaking && !speechPaused}
+                        >
+                          ■ Stop
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="telemetry-strip">
                     <div className="telemetry-mini">
                       <div className="telemetry-mini-label">Verdict</div>

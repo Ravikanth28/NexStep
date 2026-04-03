@@ -26,6 +26,7 @@ class QuestionCreate(BaseModel):
     concept_tags: list[str] = []
     hints: list[str] = []
     allow_copy_paste: bool = True
+    problem_image: str | None = None  # base64-encoded image of the expression
 
 
 def _serialize_question(q: Question):
@@ -43,6 +44,7 @@ def _serialize_question(q: Question):
         "analysis_confidence": q.analysis_confidence,
         "hints": json.loads(q.hints) if q.hints else [],
         "allow_copy_paste": q.allow_copy_paste,
+        "problem_image": q.problem_image,
         "created_by": q.creator.username if q.creator else None,
         "created_at": str(q.created_at),
     }
@@ -86,6 +88,40 @@ def analyze_question_payload(req: QuestionCreate):
             "concept_tags": req.concept_tags,
         },
     }
+
+
+class ParseImageRequest(BaseModel):
+    image_b64: str
+
+
+@router.post("/parse-image")
+async def parse_expression_image(
+    req: ParseImageRequest,
+    current_user: User = Depends(_resolve_user),
+):
+    """Use AI to extract a SymPy-compatible math expression from a base64 image."""
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can use this feature")
+
+    from ai_engine import get_ai_response
+
+    system_prompt = (
+        "You are a math OCR engine. The user provides a base64-encoded image of a mathematical "
+        "expression or equation. Extract the expression and return ONLY a JSON object:\n"
+        '{"expression": "<sympy_expression>", "confidence": 0.95}\n'
+        "Convert to SymPy-compatible syntax (e.g. x**2, integrate(x**2, (x, 0, 1)), sin(x), etc.)."
+    )
+    short_b64 = req.image_b64[:200] if len(req.image_b64) > 200 else req.image_b64
+    prompt = f"Extract the math expression from this image (base64 prefix): {short_b64}..."
+    response_text = await get_ai_response(prompt, system_prompt)
+
+    try:
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        data = json.loads(response_text)
+        return data
+    except Exception as e:
+        return {"expression": "", "error": f"Failed to parse image: {str(e)}"}
 
 
 @router.get("/{question_id}/answer")
@@ -141,6 +177,7 @@ def create_question(
         analysis_confidence=analysis.confidence,
         hints=json.dumps(req.hints),
         allow_copy_paste=req.allow_copy_paste,
+        problem_image=req.problem_image,
         created_by=current_user.id
     )
     db.add(question)
