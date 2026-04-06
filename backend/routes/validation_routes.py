@@ -435,7 +435,10 @@ async def vision_parse_math(
     short_str = full_str[0:100] if len(full_str) > 100 else full_str
     prompt = f"Extract steps from this mathematical image (Base64 data provided: {short_str}...)"
     response_text = await get_ai_response(prompt, system_prompt)
-    
+
+    if not response_text:
+        return {"steps": [], "error": "AI providers are currently unavailable."}
+
     try:
         if "```json" in response_text:
             response_text = response_text.split("```json")[1].split("```")[0].strip()

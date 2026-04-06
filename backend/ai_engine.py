@@ -116,7 +116,9 @@ async def get_ai_response(prompt: str, system_instruction: str = "") -> str:
     if response:
         return response
     
-    return "Error: All AI systems are technically offline. Check your API keys."
+    # Both failed — return sentinel value that callers can detect without crashing
+    logger.error("All AI providers unavailable.")
+    return ""
 
 async def analyze_math_step(problem: str, current_steps: List[str], new_step: str) -> Dict[str, Any]:
     """Analyze a single math step using Hybrid AI logic."""
@@ -251,6 +253,11 @@ async def evaluate_student_solution(
     }
 
     raw_response = await get_ai_response(json.dumps(user_payload), system_prompt)
+
+    # If all AI providers are down, bail out immediately so the SymPy fallback runs
+    if not raw_response:
+        logger.warning("AI evaluation skipped — no response from any provider.")
+        return None
 
     try:
         json_str = raw_response.strip()

@@ -1300,20 +1300,20 @@ def _fourier_coeff_check(step_text: str, expected_expr, label: str) -> dict | No
 
 
 def validate_fourier_a0_steps(steps: list[str], problem_expr_str: str) -> dict:
-    """Strict step-by-step validator for finding a0 of f(x)=x^2 on [0, 2pi].
+    """Non-positional validator for finding a₀ of f(x)=x² on [0, 2π].
 
-    Expected steps (from reference):
-      1. a0 = (1/pi) * integral(0 to 2pi) f(x) dx         — formula
-      2. = (1/pi) * integral(0 to 2pi) x^2 dx = (1/pi)[x^3/3]_0^{2pi}  — antiderivative
-      3. = (1/pi) * [8pi^3/3 - 0]                          — evaluate limits
-      4. a0 = 8pi^2/3                                       — final answer
+    Accepts steps in any order / any number.  Each step is valid if it matches
+    any of the known patterns for the a₀ derivation:
+      - a₀ formula setup: a₀ = (1/π)∫f(x)dx
+      - Substitution: x² appears
+      - Antiderivative: x³/3 shown
+      - Limit evaluation: 8π³/3 intermediate
+      - Final answer: 8π²/3 (symbolic or text match)
+      - Explanatory prose
     """
     results = []
     all_valid = True
-    total_marks = 4  # 4 steps max
-
-    # Expected intermediate values
-    antideriv_result = 8 * pi**3 / 3      # [x^3/3] from 0 to 2pi
+    antideriv_result = 8 * pi**3 / 3      # [x^3/3] from 0 to 2pi * pi = 8pi^3/3
     final_answer = 8 * pi**2 / 3          # (1/pi) * 8pi^3/3
 
     for idx, step_text in enumerate(steps):
@@ -1322,61 +1322,67 @@ def validate_fourier_a0_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        # Step 1: Formula setup — a0 = (1/pi) * integral f(x) dx
-        if idx == 0:
-            if ("a0" in lowered or "a_0" in lowered) and ("1/pi" in lowered or "1/π" in lowered) and ("integral" in lowered or "∫" in raw or "int" in lowered):
-                valid = True
-                message = "Correct: a₀ formula setup."
-            elif "a0" in lowered and "f(x)" in lowered:
-                valid = True
-                message = "Correct: a₀ formula setup."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and expressions_equal(parsed, final_answer):
-                    valid = True
-                    message = "Correct a₀ value (but show the formula first for full marks)."
+        # Pattern A: a₀ formula setup — mentions a₀ + integral notation
+        if (
+            ("a0" in lowered or "a_0" in lowered or "a₀" in raw.lower())
+            and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered
+                 or "∫" in raw or "int" in lowered)
+        ):
+            valid = True
+            message = "Correct: a₀ formula setup."
 
-        # Step 2: Substitute f(x)=x^2, antiderivative x^3/3
-        elif idx == 1:
-            if ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and ("x^3/3" in lowered or "x**3/3" in lowered or "x³/3" in lowered):
-                valid = True
-                message = "Correct: substituted f(x)=x² and found antiderivative x³/3."
-            elif "x^2" in lowered or "x**2" in lowered:
-                valid = True
+        # Pattern B: formula with f(x) listed
+        elif (
+            ("a0" in lowered or "a_0" in lowered or "a₀" in raw.lower())
+            and "f(x)" in lowered
+        ):
+            valid = True
+            message = "Correct: a₀ formula setup."
+
+        # Pattern C: substitution — x² visible
+        elif "x^2" in lowered or "x**2" in lowered or "x²" in lowered:
+            valid = True
+            if "x^3/3" in lowered or "x**3/3" in lowered or "x³/3" in lowered:
+                message = "Correct: substituted f(x) = x² and found antiderivative x³/3."
+            else:
                 message = "Correct: substituted f(x) = x²."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and (expressions_equal(parsed, antideriv_result) or expressions_equal(parsed, final_answer)):
-                    valid = True
-                    message = "Correct intermediate value."
 
-        # Step 3: Evaluate limits — (1/pi)[8pi^3/3 - 0]
-        elif idx == 2:
-            if ("8pi^3/3" in lowered or "8*pi**3/3" in lowered or "8π³/3" in lowered or "8pi³/3" in lowered):
-                valid = True
-                message = "Correct: evaluated [x³/3] at limits 0 and 2π."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and (expressions_equal(parsed, antideriv_result) or expressions_equal(parsed, antideriv_result / pi) or expressions_equal(parsed, final_answer)):
-                    valid = True
-                    message = "Correct limit evaluation."
+        # Pattern D: antiderivative bracket [x³/3] at limits
+        elif "x^3/3" in lowered or "x**3/3" in lowered or "x³/3" in lowered:
+            valid = True
+            message = "Correct: antiderivative x³/3 evaluated at limits."
 
-        # Step 4: Final answer — a0 = 8pi^2/3
-        elif idx == 3:
-            parsed = parse_expression_candidate(raw)
-            if parsed is not None and expressions_equal(parsed, final_answer):
-                valid = True
-                message = "Correct: a₀ = 8π²/3. ✓"
-            elif "8pi^2/3" in lowered or "8*pi**2/3" in lowered or "8π²/3" in lowered:
-                valid = True
-                message = "Correct: a₀ = 8π²/3. ✓"
+        # Pattern E: explanatory prose
+        elif _is_explanatory_only(raw):
+            valid = True
+            message = "Accepted: explanatory step."
 
-        # Extra steps beyond expected 4
+        # Pattern F: intermediate limit value — 8π³/3
+        elif (
+            "8pi^3/3" in lowered or "8*pi**3/3" in lowered
+            or "8π³/3" in lowered or "8pi³/3" in lowered
+        ):
+            valid = True
+            message = "Correct: evaluated [x³/3] from 0 to 2π gives 8π³/3."
+
+        # Pattern G: final answer — 8π²/3 (text check)
+        elif (
+            "8pi^2/3" in lowered or "8*pi**2/3" in lowered
+            or "8π²/3" in lowered or "8pi²/3" in lowered
+        ):
+            valid = True
+            message = "Correct: a₀ = 8π²/3. ✓"
+
+        # Pattern H: SymPy symbolic equality (catches things like (1/pi)*(8*pi**3/3))
         else:
             parsed = parse_expression_candidate(raw)
-            if parsed is not None and expressions_equal(parsed, final_answer):
+            if parsed is not None and (
+                expressions_equal(parsed, final_answer)
+                or expressions_equal(parsed, antideriv_result)
+                or expressions_equal(parsed, antideriv_result / pi)
+            ):
                 valid = True
-                message = "Correct final value repeated."
+                message = "Correct: a₀ = 8π²/3. ✓"
 
         if not valid:
             all_valid = False
@@ -1384,7 +1390,7 @@ def validate_fourier_a0_steps(steps: list[str], problem_expr_str: str) -> dict:
             "step": idx + 1,
             "expression": step_text,
             "valid": valid,
-            "error": message or f"Step {idx+1} does not match expected derivation for a₀.",
+            "error": message or "This step does not match a known pattern for the a₀ = 8π²/3 derivation.",
         })
 
     return {

@@ -115,6 +115,9 @@ async def parse_expression_image(
     prompt = f"Extract the math expression from this image (base64 prefix): {short_b64}..."
     response_text = await get_ai_response(prompt, system_prompt)
 
+    if not response_text:
+        return {"expression": "", "error": "AI providers are currently unavailable. Please enter the expression manually."}
+
     try:
         if "```json" in response_text:
             response_text = response_text.split("```json")[1].split("```")[0].strip()
