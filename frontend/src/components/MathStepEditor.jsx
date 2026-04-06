@@ -392,7 +392,7 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
         const mf = stepRefs.current[idx]?.current;
         if (mf) {
           mf.focus();
-          mf.insert(latex);
+          mf.insert(latex, { format: 'latex' });
         }
       };
     }

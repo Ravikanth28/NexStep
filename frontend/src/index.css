@@ -1558,6 +1558,22 @@ math-field::part(virtual-keyboard-toggle) {
   border-left: 3px solid var(--accent-secondary);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              padding 0.35s ease,
+              background 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.35s ease;
+  transform-origin: left center;
+}
+
+.solution-step.solution-step-speaking {
+  background: rgba(0, 242, 255, 0.1);
+  border-left: 3px solid var(--accent-primary);
+  transform: scale(1.035);
+  padding: 20px 20px;
+  box-shadow: 0 0 0 1px rgba(0,242,255,0.18), 0 6px 32px rgba(0,242,255,0.14);
+  z-index: 1;
+  position: relative;
 }
 
 .solution-step-index {
@@ -1571,6 +1587,16 @@ math-field::part(virtual-keyboard-toggle) {
   color: var(--accent-secondary);
   font-size: 0.78rem;
   font-weight: 800;
+  transition: background 0.3s ease, color 0.3s ease,
+              min-width 0.35s ease, height 0.35s ease, font-size 0.35s ease;
+}
+
+.solution-step.solution-step-speaking .solution-step-index {
+  background: var(--accent-primary);
+  color: #000;
+  min-width: 36px;
+  height: 36px;
+  font-size: 0.9rem;
 }
 
 .solution-step-title {
@@ -1578,11 +1604,23 @@ math-field::part(virtual-keyboard-toggle) {
   color: white;
   font-size: 0.82rem;
   font-weight: 700;
+  transition: font-size 0.35s ease, color 0.3s ease;
+}
+
+.solution-step.solution-step-speaking .solution-step-title {
+  font-size: 0.95rem;
+  color: var(--accent-primary);
 }
 
 .solution-step-detail {
   color: var(--accent-secondary);
   font-size: 0.82rem;
+  transition: font-size 0.35s ease, color 0.3s ease;
+}
+
+.solution-step.solution-step-speaking .solution-step-detail {
+  font-size: 0.9rem;
+  color: rgba(0,242,255,0.8);
 }
 
 @media (max-width: 1100px) {

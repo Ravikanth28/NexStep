@@ -5,8 +5,8 @@ import 'mathlive';
 import MathKeyboard from '../components/MathKeyboard';
 import MathStepEditor from '../components/MathStepEditor';
 import {
-  buildExplanationScript,
-  speak,
+  buildExplanationSegments,
+  speakSegments,
   stopSpeech,
   pauseSpeech,
   resumeSpeech,
@@ -48,11 +48,13 @@ export default function SolvePage() {
   const [speaking, setSpeaking] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speechReady, setSpeechReady] = useState(false);
+  const [speakingStepIndex, setSpeakingStepIndex] = useState(null);
   const [voiceLang, setVoiceLang] = useState('en-IN');
   const [voiceSpeaker, setVoiceSpeaker] = useState('ritu');
+  const [voicePace, setVoicePace] = useState(1.0);
   const [isRecording, setIsRecording] = useState(false);
   const [micLoading, setMicLoading] = useState(false);
-  const speechScriptRef = useRef('');
+  const speechSegmentsRef = useRef([]);
   const insertFromKeyboardRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -69,10 +71,10 @@ export default function SolvePage() {
     return () => clearInterval(interval);
   }, [timerActive]);
 
-  // Build explanation script when results arrive — user clicks Explain to play
+  // Build explanation segments when results arrive — user clicks Explain to play
   useEffect(() => {
     if (!verdict || !question) return;
-    const script = buildExplanationScript({
+    const segments = buildExplanationSegments({
       questionTitle: question.title,
       problemExpr: question.problem_expr,
       verdict,
@@ -82,10 +84,11 @@ export default function SolvePage() {
       results,
       feedback,
     });
-    speechScriptRef.current = script;
+    speechSegmentsRef.current = segments;
     setSpeechReady(true);
     setSpeaking(false);
     setSpeechPaused(false);
+    setSpeakingStepIndex(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verdict]);
 
@@ -99,14 +102,16 @@ export default function SolvePage() {
       resumeSpeech();
       setSpeaking(true);
       setSpeechPaused(false);
-    } else if (!speaking && speechScriptRef.current) {
+    } else if (!speaking && speechSegmentsRef.current.length > 0) {
       setSpeaking(true);
-      speak(speechScriptRef.current, {
+      speakSegments(speechSegmentsRef.current, {
         language: voiceLang,
         speaker: voiceSpeaker,
+        pace: voicePace,
+        onStepChange: (si) => setSpeakingStepIndex(si),
         onStart: () => { setSpeaking(true); setSpeechPaused(false); },
-        onEnd: () => { setSpeaking(false); setSpeechPaused(false); },
-        onError: () => { setSpeaking(false); setSpeechPaused(false); },
+        onEnd: () => { setSpeaking(false); setSpeechPaused(false); setSpeakingStepIndex(null); },
+        onError: () => { setSpeaking(false); setSpeechPaused(false); setSpeakingStepIndex(null); },
       });
     }
   };
@@ -121,6 +126,7 @@ export default function SolvePage() {
     stopSpeech();
     setSpeaking(false);
     setSpeechPaused(false);
+    setSpeakingStepIndex(null);
   };
 
   const loadQuestion = async () => {
@@ -287,7 +293,8 @@ export default function SolvePage() {
     if (!window.confirm('Delete all code and reset?')) return;
     handleSpeechStop();
     setSpeechReady(false);
-    speechScriptRef.current = '';
+    speechSegmentsRef.current = [];
+    setSpeakingStepIndex(null);
     setSteps(['']);
     setResults(null);
     setVerdict(null);
@@ -525,7 +532,10 @@ export default function SolvePage() {
               ) : (
                 <div className="solution-list solution-list-always-open">
                   {solutionSteps.map((s) => (
-                    <div key={s.step} className="solution-step">
+                    <div
+                      key={s.step}
+                      className={`solution-step${speakingStepIndex === s.step ? ' solution-step-speaking' : ''}`}
+                    >
                       <div className="solution-step-index">{s.step}</div>
                       <div style={{ flex: 1 }}>
                         <div className="solution-step-title">{s.title}</div>
@@ -587,7 +597,7 @@ export default function SolvePage() {
                       </div>
 
                       {/* Voice & Language selectors */}
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.07em', marginBottom: '4px' }}>LANGUAGE</div>
                           <select
@@ -640,6 +650,34 @@ export default function SolvePage() {
                             <option value="aditya">Aditya (Male)</option>
                             <option value="rohan">Rohan (Male)</option>
                           </select>
+                        </div>
+                      </div>
+
+                      {/* Speed slider */}
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>SPEED</div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-primary)', fontFamily: 'JetBrains Mono' }}>
+                            {voicePace === 1.0 ? '1.0× Normal' : voicePace < 1.0 ? `${voicePace}× Slow` : `${voicePace}× Fast`}
+                          </div>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2.0"
+                          step="0.1"
+                          value={voicePace}
+                          disabled={speaking}
+                          onChange={(e) => setVoicePace(parseFloat(e.target.value))}
+                          style={{
+                            width: '100%',
+                            accentColor: 'var(--accent-primary)',
+                            cursor: speaking ? 'not-allowed' : 'pointer',
+                            opacity: speaking ? 0.5 : 1,
+                          }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          <span>0.5×</span><span>1.0×</span><span>1.5×</span><span>2.0×</span>
                         </div>
                       </div>
 
