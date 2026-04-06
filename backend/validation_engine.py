@@ -1322,18 +1322,18 @@ def validate_fourier_a0_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        # Pattern A: a₀ formula setup — mentions a₀ + integral notation
+        # Pattern A: a₀ formula setup — mentions a₀/a_0/a_{0} + integral notation
         if (
-            ("a0" in lowered or "a_0" in lowered or "a₀" in raw.lower())
+            ("a0" in lowered or "a_0" in lowered or "a_{0}" in lowered or "a₀" in raw.lower())
             and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered
-                 or "∫" in raw or "int" in lowered)
+                 or "∫" in raw or "int" in lowered or "frac" in lowered)
         ):
             valid = True
             message = "Correct: a₀ formula setup."
 
         # Pattern B: formula with f(x) listed
         elif (
-            ("a0" in lowered or "a_0" in lowered or "a₀" in raw.lower())
+            ("a0" in lowered or "a_0" in lowered or "a_{0}" in lowered or "a₀" in raw.lower())
             and "f(x)" in lowered
         ):
             valid = True
@@ -1439,19 +1439,19 @@ def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        # Pattern A: aₙ formula setup — mentions aₙ/a_n + cos + integral notation
+        # Pattern A: aₙ formula setup — mentions aₙ/a_n/a_{n} + cos + integral notation
         if (
-            ("an" in lowered or "a_n" in lowered or "aₙ" in raw.lower())
+            ("an" in lowered or "a_n" in lowered or "a_{n}" in lowered or "aₙ" in raw.lower())
             and "cos" in lowered
             and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered
-                 or "∫" in raw or "int" in lowered)
+                 or "∫" in raw or "int" in lowered or "frac" in lowered)
         ):
             valid = True
             message = "Correct: aₙ formula setup with cos(nx)."
 
         # Pattern B: formula without explicit integral keyword but shows f(x)cos
         elif (
-            ("an" in lowered or "a_n" in lowered or "aₙ" in raw.lower())
+            ("an" in lowered or "a_n" in lowered or "a_{n}" in lowered or "aₙ" in raw.lower())
             and "f(x)" in lowered
             and "cos" in lowered
         ):
@@ -1538,19 +1538,19 @@ def validate_fourier_bn_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        # Pattern A: bₙ formula setup — mentions bₙ/b_n + sin + integral notation
+        # Pattern A: bₙ formula setup — mentions bₙ/b_n/b_{n} + sin + integral notation
         if (
-            ("bn" in lowered or "b_n" in lowered or "bₙ" in raw.lower())
+            ("bn" in lowered or "b_n" in lowered or "b_{n}" in lowered or "bₙ" in raw.lower())
             and "sin" in lowered
             and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered
-                 or "∫" in raw or "int" in lowered)
+                 or "∫" in raw or "int" in lowered or "frac" in lowered)
         ):
             valid = True
             message = "Correct: bₙ formula setup with sin(nx)."
 
         # Pattern B: formula without explicit integral keyword
         elif (
-            ("bn" in lowered or "b_n" in lowered or "bₙ" in raw.lower())
+            ("bn" in lowered or "b_n" in lowered or "b_{n}" in lowered or "bₙ" in raw.lower())
             and "f(x)" in lowered
             and "sin" in lowered
         ):

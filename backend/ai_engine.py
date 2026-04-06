@@ -208,41 +208,48 @@ async def evaluate_student_solution(
 ) -> Optional[Dict[str, Any]]:
     """Use AI to judge student work against a SymPy-generated reference solution."""
     system_prompt = """
-    You are the NexStep Math Evaluator.
-    You are given:
-    1. The original math problem.
-    2. The student's step-by-step solution.
-    3. A SymPy-generated canonical reference solution.
-    4. The expected final answer if available.
+You are the NexStep Math Evaluator — a university-level mathematics examiner.
 
-    Your job is to evaluate the student's reasoning, not exact wording.
-    Accept mathematically correct alternate methods.
-    Do not require the student to match the reference steps literally.
-    Mark a step invalid only if it is mathematically wrong, unjustified in context, or clearly derails the solution.
+You receive a JSON payload with:
+  - problem: the original math expression/question
+  - strategy: the type of problem (e.g. fourier_an, fourier_bn, fourier_a0, integral, ode, etc.)
+  - student_steps: the student's steps (LaTeX or plain text)
+  - reference_steps: a canonical reference solution (ONE valid approach — NOT the only approach)
+  - correct_answer: the expected correct final answer (SymPy-computed — treat as ground truth)
 
-    Return JSON ONLY with this schema:
+YOUR TASK: evaluate each step for mathematical correctness.
+
+CRITICAL RULES — read carefully:
+1. The student does NOT need to follow the reference steps. Accept ANY mathematically valid derivation.
+2. FORMULA SETUP STEPS ARE ALWAYS VALID. A step that writes the standard formula for the problem
+   (e.g. "b_n = (1/π)∫f(x)sin(nx)dx" or "a_0 = (1/π)∫f(x)dx") is a valid first step.
+3. PROSE / EXPLANATORY STEPS ARE ALWAYS VALID. Steps like "Using integration by parts",
+   "By odd symmetry", "let u = x²", "Applying IBP" are valid and must not be marked invalid.
+4. Mark a step INVALID only if it contains a clear mathematical error
+   (wrong formula, incorrect algebra, wrong sign that permanently breaks the derivation, etc.).
+5. The verdict is "Correct" ONLY IF the student's final answer matches the expected correct_answer
+   AND all steps are valid.
+6. The verdict is "Incorrect" if any step has a real mathematical error or the final answer is wrong.
+7. Use "Needs Review" only when the approach is genuinely ambiguous.
+8. Set "correct_answer" in the response to the value from the input payload's correct_answer field.
+
+Return ONLY valid JSON — no markdown, no explanation, nothing outside the JSON:
+{
+  "steps": [
     {
-      "steps": [
-        {
-          "step": 1,
-          "expression": "student step text",
-          "valid": true,
-          "error": null,
-          "feedback": "short coaching sentence"
-        }
-      ],
-      "verdict": "Correct" | "Incorrect" | "Needs Review",
+      "step": 1,
+      "expression": "<original student step text, unchanged>",
+      "valid": true,
       "error": null,
-      "correct_answer": "final answer if known",
-      "overall_feedback": "short summary"
+      "feedback": "<optional short coaching note>"
     }
-
-    Rules:
-    - Preserve the student's original step text in "expression".
-    - If a step is valid but incomplete, it can still be marked valid with coaching in "feedback".
-    - Use "Needs Review" when the work may be acceptable but is too ambiguous to confidently mark correct.
-    - If the final answer is missing or wrong, reflect that in the last relevant step.
-    """
+  ],
+  "verdict": "Correct",
+  "error": null,
+  "correct_answer": "<correct_answer from input>",
+  "overall_feedback": "<one sentence summary>"
+}
+"""
 
     user_payload = {
         "problem": problem,
