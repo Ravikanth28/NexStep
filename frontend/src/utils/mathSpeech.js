@@ -188,44 +188,200 @@ export function buildExplanationScript({
   return parts.join('  ');
 }
 
-// ── Speech synthesis helpers ───────────────────────────────────────────────
+// ── Spoken text → LaTeX converter (for STT input) ────────────────────────
 
-export function speak(text, { onStart, onEnd, onError, rate = 0.92, pitch = 1.0 } = {}) {
-  if (!window.speechSynthesis) return null;
+export function speechToLatex(text) {
+  if (!text) return text;
+  let t = String(text).trim();
 
-  window.speechSynthesis.cancel();
+  // Fractions
+  t = t.replace(/\bone half\b/gi, '\\frac{1}{2}');
+  t = t.replace(/\bone third\b/gi, '\\frac{1}{3}');
+  t = t.replace(/\bone fourth\b|\bone quarter\b/gi, '\\frac{1}{4}');
+  t = t.replace(/\bfraction\s+(\S+)\s+over\s+(\S+)/gi, '\\frac{$1}{$2}');
+  t = t.replace(/(\S+)\s+over\s+(\S+)/gi, '\\frac{$1}{$2}');
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = rate;
-  utterance.pitch = pitch;
-  utterance.lang = 'en-US';
+  // Powers — must come before symbol replacements
+  t = t.replace(/\b(\w+)\s+to\s+the\s+power\s+of\s+(\w+)/gi, '$1^{$2}');
+  t = t.replace(/\b(\w+)\s+squared\b/gi, '$1^{2}');
+  t = t.replace(/\b(\w+)\s+cubed\b/gi, '$1^{3}');
 
-  // Prefer a clear English voice if available
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(
-    (v) =>
-      v.lang.startsWith('en') &&
-      (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Neural'))
-  ) || voices.find((v) => v.lang.startsWith('en'));
+  // Roots
+  t = t.replace(/\bsquare\s+root\s+of\s+(\S+)/gi, '\\sqrt{$1}');
+  t = t.replace(/\bsquare\s+root\b/gi, '\\sqrt{}');
+  t = t.replace(/\bcube\s+root\s+of\s+(\S+)/gi, '{$1}^{1/3}');
 
-  if (preferred) utterance.voice = preferred;
+  // Calculus
+  t = t.replace(/\bintegral\s+from\s+(\S+)\s+to\s+(\S+)\s+of\b/gi, '\\int_{$1}^{$2}');
+  t = t.replace(/\bintegral\s+of\b/gi, '\\int');
+  t = t.replace(/\bintegral\b/gi, '\\int');
+  t = t.replace(/\bderivative\s+of\b/gi, '\\frac{d}{dx}');
+  t = t.replace(/\bpartial\s+derivative\b/gi, '\\partial');
+  t = t.replace(/\blimit\s+as\s+(\S+)\s+approaches\s+(\S+)/gi, '\\lim_{$1 \\to $2}');
+  t = t.replace(/\blimit\b/gi, '\\lim');
+  t = t.replace(/\bsum\s+from\s+(\S+)\s+to\s+(\S+)\s+of\b/gi, '\\sum_{$1}^{$2}');
+  t = t.replace(/\bsummation\b/gi, '\\sum');
 
-  if (onStart) utterance.onstart = onStart;
-  if (onEnd) utterance.onend = onEnd;
-  if (onError) utterance.onerror = onError;
+  // Trig
+  t = t.replace(/\bhyperbolic\s+sine\b/gi, '\\sinh');
+  t = t.replace(/\bhyperbolic\s+cosine\b/gi, '\\cosh');
+  t = t.replace(/\bhyperbolic\s+tangent\b/gi, '\\tanh');
+  t = t.replace(/\barc\s*sine\b|\barcsin\b/gi, '\\arcsin');
+  t = t.replace(/\barc\s*cosine\b|\barccos\b/gi, '\\arccos');
+  t = t.replace(/\barc\s*tangent\b|\barctan\b/gi, '\\arctan');
+  t = t.replace(/\bsine\b/gi, '\\sin');
+  t = t.replace(/\bcosine\b/gi, '\\cos');
+  t = t.replace(/\btangent\b/gi, '\\tan');
+  t = t.replace(/\bcotangent\b/gi, '\\cot');
+  t = t.replace(/\bsecant\b/gi, '\\sec');
+  t = t.replace(/\bcosecant\b/gi, '\\csc');
 
-  window.speechSynthesis.speak(utterance);
-  return utterance;
+  // Logs
+  t = t.replace(/\bnatural\s+log\b/gi, '\\ln');
+  t = t.replace(/\bnatural\s+logarithm\b/gi, '\\ln');
+  t = t.replace(/\blogarithm\b|\blog\b/gi, '\\log');
+
+  // Greek letters
+  t = t.replace(/\balpha\b/gi, '\\alpha');
+  t = t.replace(/\bbeta\b/gi, '\\beta');
+  t = t.replace(/\bgamma\b/gi, '\\gamma');
+  t = t.replace(/\bdelta\b/gi, '\\delta');
+  t = t.replace(/\bepsilon\b/gi, '\\epsilon');
+  t = t.replace(/\btheta\b/gi, '\\theta');
+  t = t.replace(/\blambda\b/gi, '\\lambda');
+  t = t.replace(/\bmu\b/gi, '\\mu');
+  t = t.replace(/\bsigma\b/gi, '\\sigma');
+  t = t.replace(/\bomega\b/gi, '\\omega');
+  t = t.replace(/\bpi\b/gi, '\\pi');
+  t = t.replace(/\bphi\b/gi, '\\phi');
+  t = t.replace(/\bpsi\b/gi, '\\psi');
+  t = t.replace(/\brho\b/gi, '\\rho');
+  t = t.replace(/\beta\b/gi, '\\eta');
+
+  // Constants & symbols
+  t = t.replace(/\binfinity\b/gi, '\\infty');
+  t = t.replace(/\bplus\s+or\s+minus\b/gi, '\\pm');
+  t = t.replace(/\btimes\b/gi, '\\times');
+  t = t.replace(/\bdivided\s+by\b/gi, '\\div');
+  t = t.replace(/\bless\s+than\s+or\s+equal\s+to\b/gi, '\\leq');
+  t = t.replace(/\bgreater\s+than\s+or\s+equal\s+to\b/gi, '\\geq');
+  t = t.replace(/\bnot\s+equal\s+to\b/gi, '\\neq');
+  t = t.replace(/\bapproximately\s+equal\s+to\b|\bapproximately\b/gi, '\\approx');
+  t = t.replace(/\bapproaches\b/gi, '\\to');
+  t = t.replace(/\bless\s+than\b/gi, '<');
+  t = t.replace(/\bgreater\s+than\b/gi, '>');
+  t = t.replace(/\bequals\b|\bequal\s+to\b/gi, '=');
+  t = t.replace(/\bplus\b/gi, '+');
+  t = t.replace(/\bminus\b/gi, '-');
+
+  return t.trim();
+}
+
+// ── Sarvam AI TTS helpers ──────────────────────────────────────────────────
+
+// Internal state for the active audio source so we can stop/pause/resume it.
+let _audioCtx = null;
+let _sourceNode = null;
+let _pauseOffset = 0;
+let _startTime = 0;
+let _audioBuffer = null;
+let _onEndCallback = null;
+let _isSarvamPaused = false;
+
+function _getAudioContext() {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return _audioCtx;
+}
+
+function _playBuffer(buffer, offset, onEnd) {
+  const ctx = _getAudioContext();
+  if (_sourceNode) {
+    try { _sourceNode.disconnect(); } catch (_) {}
+  }
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.onended = () => {
+    if (!_isSarvamPaused && onEnd) onEnd();
+  };
+  source.start(0, offset);
+  _sourceNode = source;
+  _startTime = ctx.currentTime - offset;
+}
+
+/**
+ * Speak text via Sarvam AI TTS (bulbul:v3).
+ * Falls back to browser speechSynthesis if the API call fails.
+ */
+export async function speak(text, { onStart, onEnd, onError, pace = 1.0, language = 'en-IN', speaker = 'ritu' } = {}) {
+  // Stop any existing audio first
+  stopSpeech();
+  _isSarvamPaused = false;
+  _pauseOffset = 0;
+  _onEndCallback = onEnd || null;
+
+  if (onStart) onStart();
+
+  try {
+    const res = await fetch('/api/voice/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, pace, language, speaker }),
+    });
+
+    if (!res.ok) throw new Error(`TTS request failed: ${res.status}`);
+
+    const { audio_b64 } = await res.json();
+
+    // Decode base64 WAV → ArrayBuffer → AudioBuffer
+    const binaryStr = atob(audio_b64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+    const ctx = _getAudioContext();
+    _audioBuffer = await ctx.decodeAudioData(bytes.buffer);
+    _playBuffer(_audioBuffer, 0, _onEndCallback);
+  } catch (err) {
+    console.warn('Sarvam TTS failed, falling back to browser speech:', err);
+    if (onError) onError(err);
+    // Fallback to browser speechSynthesis
+    if (!window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    if (onEnd) utterance.onend = onEnd;
+    window.speechSynthesis.speak(utterance);
+  }
 }
 
 export function stopSpeech() {
+  _isSarvamPaused = false;
+  _pauseOffset = 0;
+  _audioBuffer = null;
+  if (_sourceNode) {
+    try { _sourceNode.onended = null; _sourceNode.stop(); _sourceNode.disconnect(); } catch (_) {}
+    _sourceNode = null;
+  }
   if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
 export function pauseSpeech() {
-  if (window.speechSynthesis) window.speechSynthesis.pause();
+  if (_sourceNode && _audioCtx && !_isSarvamPaused) {
+    _pauseOffset = _audioCtx.currentTime - _startTime;
+    _isSarvamPaused = true;
+    try { _sourceNode.onended = null; _sourceNode.stop(); } catch (_) {}
+    _sourceNode = null;
+  } else if (window.speechSynthesis) {
+    window.speechSynthesis.pause();
+  }
 }
 
 export function resumeSpeech() {
-  if (window.speechSynthesis) window.speechSynthesis.resume();
+  if (_isSarvamPaused && _audioBuffer) {
+    _isSarvamPaused = false;
+    _playBuffer(_audioBuffer, _pauseOffset, _onEndCallback);
+  } else if (window.speechSynthesis) {
+    window.speechSynthesis.resume();
+  }
 }

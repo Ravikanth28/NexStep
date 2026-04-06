@@ -1,5 +1,6 @@
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
 }
 
 :root {
@@ -678,12 +679,100 @@ input, textarea, select {
   font-size: 1rem;
   transition: all 0.3s;
   outline: none;
+  color-scheme: dark;
 }
 
 input:focus, textarea:focus, select:focus {
   border-color: var(--accent-primary);
   background: rgba(255,255,255,0.06);
   box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
+}
+
+/* Force dark background for native select dropdown popup */
+select option {
+  background-color: #10182b;
+  color: #f8fafc;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #1e2d4a;
+  color: #5ea0ff;
+}
+
+/* -- Form Group -- */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.form-group label {
+  margin-bottom: 10px;
+}
+
+/* -- Empty State -- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  color: var(--text-muted);
+  gap: 16px;
+}
+
+/* -- Questions Grid -- */
+.questions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 24px;
+}
+
+/* -- Problem Expression Block -- */
+.problem {
+  margin-top: 24px;
+  padding: 20px 24px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-main);
+  background: rgba(0, 0, 0, 0.4);
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent-primary);
+  word-break: break-word;
+  line-height: 1.7;
+}
+
+/* -- Fade In Animation -- */
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* -- Pulse Animation (mic recording) -- */
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 68, 68, 0); }
+}
+
+/* -- Heartbeat dot (engine status) -- */
+.heartbeat {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-success);
+  margin-right: 8px;
+  animation: heartbeatPulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes heartbeatPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.75); }
 }
 
 .question-toolbar {
@@ -1025,11 +1114,9 @@ canvas.mathbox-canvas {
 .tab-strip, .soft-pill, .builder-grid, .question-browser, .analysis-stack, .analysis-card,
 .analysis-grid, .analysis-item, .analysis-panel, .analysis-note-list, .feedback-panel,
 .feedback-summary, .feedback-group, .feedback-chip, .success-banner, .form-row-two, 
-.sidebar-topic-btn, .question-toolbar, .question-subline, .question-card-top, .syllabus-card,
-.syllabus-mini-item, .hero-expression, .maths-orbit-card, .solve-summary-grid, .solve-summary-item,
+.sidebar-topic-btn, .maths-orbit-card, .solve-summary-grid, .solve-summary-item,
 .solve-quick-note, .math-expression-block, .solver-layout-enhanced, .math-keyboard-wrap, .solver-card {
   all: unset;
-  /* Re-defining some utilities to avoid breakage but they should use new classes mostly */
   display: block; 
 }
 /* Re-adding some critical layouts that use the legacy classes but need better look */

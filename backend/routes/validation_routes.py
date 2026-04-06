@@ -131,6 +131,15 @@ async def validate_solution(
         strategy=strategy,
     )
 
+    # For Fourier coefficient types the AI is unreliable — use the SymPy
+    # validator directly so the exact symbolic formulas are always checked.
+    if strategy in ("fourier_an", "fourier_bn", "fourier_a0"):
+        result = validate_steps(
+            req.steps,
+            question.problem_expr,
+            strategy,
+        )
+
     if not result:
         result = validate_steps(
             req.steps,
@@ -139,6 +148,10 @@ async def validate_solution(
         )
         if "correct_answer" not in result or result.get("correct_answer") is None:
             result["correct_answer"] = correct_answer
+
+    # Always trust the SymPy-computed correct_answer over whatever the AI returned
+    if correct_answer:
+        result["correct_answer"] = correct_answer
 
     # Save submission
     is_correct = result["verdict"] == "Correct"

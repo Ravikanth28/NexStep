@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from database import engine, Base, ensure_schema
-from routes import auth_routes, question_routes, validation_routes, dashboard_routes
+from routes import auth_routes, question_routes, validation_routes, dashboard_routes, voice_routes
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -36,6 +36,7 @@ app.include_router(auth_routes.router)
 app.include_router(question_routes.router)
 app.include_router(validation_routes.router)
 app.include_router(dashboard_routes.router)
+app.include_router(voice_routes.router)
 
 
 @app.get("/api/health")

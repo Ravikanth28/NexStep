@@ -1394,15 +1394,34 @@ def validate_fourier_a0_steps(steps: list[str], problem_expr_str: str) -> dict:
     }
 
 
-def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
-    """Strict step-by-step validator for finding an of f(x)=x^2 on [0, 2pi].
+def _is_explanatory_only(text: str) -> bool:
+    """Return True if the line is pure prose with no meaningful math content.
 
-    Expected steps (from reference):
-      1. an = (1/pi) * integral(0 to 2pi) f(x)cos(nx) dx      — formula
-      2. = (1/pi) * integral(0 to 2pi) x^2 cos(nx) dx          — substitution
-      3. = (1/pi)[x^2*sin(nx)/n - 2x*(-cos(nx))/n^2 + 2*(-sin(nx))/n^3]_0^{2pi}  — IBP
-      4. = (1/pi)[0 + 4pi/n^2 + 0] = 4/n^2                    — evaluate
-      5. an = 4/n^2                                              — final
+    Parentheses on their own (e.g. in "integration by parts (IBP)") don't make
+    a step mathematical.  We require at least one of + - * / ^ = ∫ ∑ or a digit
+    alongside the parentheses before treating them as math notation.
+    """
+    alpha = sum(c.isalpha() for c in text)
+    digits = sum(c.isdigit() for c in text)
+    has_math = any(c in text for c in ["+", "-", "*", "/", "^", "=", "∫", "∑"])
+    # Parentheses only count as math when accompanied by digits or operators
+    if "(" in text or ")" in text:
+        if digits > 0 or has_math:
+            has_math = True
+    return alpha > 5 and digits == 0 and not has_math
+
+
+def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
+    """Non-positional validator for finding aₙ of f(x)=x² on [0, 2π].
+
+    Accepts steps in any order / any number.  Each step is matched against all
+    known patterns for the aₙ derivation; a step is valid if it matches any of:
+      - aₙ formula setup (aₙ = (1/π)∫…cos(nx)dx)
+      - Substitution of f(x) = x²
+      - Explanatory prose ("using integration by parts", etc.)
+      - IBP expansion (contains sin + cos + /n)
+      - Boundary evaluation (contains 4π/n² or 4/n²)
+      - Final answer 4/n² (symbolic or text match)
     """
     results = []
     all_valid = True
@@ -1414,64 +1433,66 @@ def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        # Step 1: Formula — an = (1/pi) integral f(x) cos(nx) dx
-        if idx == 0:
-            if ("an" in lowered or "a_n" in lowered) and ("cos" in lowered) and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered or "∫" in raw):
-                valid = True
-                message = "Correct: aₙ formula setup with cos(nx)."
-            elif ("an" in lowered or "a_n" in lowered) and "f(x)" in lowered and "cos" in lowered:
-                valid = True
-                message = "Correct: aₙ formula setup."
+        # Pattern A: aₙ formula setup — mentions aₙ/a_n + cos + integral notation
+        if (
+            ("an" in lowered or "a_n" in lowered or "aₙ" in raw.lower())
+            and "cos" in lowered
+            and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered
+                 or "∫" in raw or "int" in lowered)
+        ):
+            valid = True
+            message = "Correct: aₙ formula setup with cos(nx)."
 
-        # Step 2: Substitute x^2 cos(nx)
-        elif idx == 1:
-            if ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and "cos" in lowered:
-                valid = True
-                message = "Correct: substituted f(x) = x² into the integral."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and expressions_equal(parsed, final_answer):
-                    valid = True
-                    message = "Correct aₙ value."
+        # Pattern B: formula without explicit integral keyword but shows f(x)cos
+        elif (
+            ("an" in lowered or "a_n" in lowered or "aₙ" in raw.lower())
+            and "f(x)" in lowered
+            and "cos" in lowered
+        ):
+            valid = True
+            message = "Correct: aₙ formula setup."
 
-        # Step 3: Integration by parts result
-        elif idx == 2:
-            if ("sin(n" in lowered or "sin(nx)" in lowered) and ("cos(n" in lowered or "cos(nx)" in lowered) and ("/n" in lowered):
-                valid = True
-                message = "Correct: integration by parts result for ∫x²cos(nx)dx."
-            elif "sin" in lowered and "cos" in lowered and "n^2" in lowered:
-                valid = True
-                message = "Correct: IBP expansion shown."
+        # Pattern C: substitution — x² + cos present
+        elif ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and "cos" in lowered:
+            valid = True
+            message = "Correct: substituted f(x) = x² into the aₙ integral."
 
-        # Step 4: Evaluate at limits → 4/n^2
-        elif idx == 3:
-            if ("4pi/n^2" in lowered or "4*pi/n**2" in lowered or "4π/n²" in lowered):
-                valid = True
-                message = "Correct: evaluated boundary terms."
-            elif "4/n^2" in lowered or "4/n²" in lowered or "4/n**2" in lowered:
-                valid = True
-                message = "Correct: simplified to 4/n²."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and expressions_equal(parsed, final_answer):
-                    valid = True
-                    message = "Correct evaluation step."
+        # Pattern D: explanatory / prose step (no math symbols)
+        elif _is_explanatory_only(raw):
+            valid = True
+            message = "Accepted: explanatory step."
 
-        # Step 5: Final answer an = 4/n^2
-        elif idx == 4:
-            parsed = parse_expression_candidate(raw)
-            if parsed is not None and expressions_equal(parsed, final_answer):
-                valid = True
-                message = "Correct: aₙ = 4/n². ✓"
-            elif "4/n^2" in lowered or "4/n²" in lowered or "4/n**2" in lowered:
-                valid = True
-                message = "Correct: aₙ = 4/n². ✓"
+        # Pattern E: IBP expansion — sin + cos + /n denominator terms
+        elif (
+            ("sin(n" in lowered or "sinnx" in lowered or "sin(nx)" in lowered)
+            and ("cos(n" in lowered or "cosnx" in lowered or "cos(nx)" in lowered)
+            and "/n" in lowered
+        ):
+            valid = True
+            message = "Correct: IBP antiderivative for ∫x²cos(nx)dx."
 
+        elif "sin" in lowered and "cos" in lowered and ("n^2" in lowered or "n**2" in lowered or "/n²" in lowered):
+            valid = True
+            message = "Correct: IBP expansion shown."
+
+        # Pattern F: boundary evaluation step — 4π/n² intermediate or final 4/n²
+        elif (
+            "4pi/n^2" in lowered or "4*pi/n^2" in lowered or "4*pi/n**2" in lowered
+            or "4π/n²" in lowered or "4pi/n²" in lowered
+        ):
+            valid = True
+            message = "Correct: boundary evaluation gives 4π/n²."
+
+        elif "4/n^2" in lowered or "4/n²" in lowered or "4/n**2" in lowered:
+            valid = True
+            message = "Correct: aₙ = 4/n². ✓"
+
+        # Pattern G: SymPy symbolic equality
         else:
             parsed = parse_expression_candidate(raw)
             if parsed is not None and expressions_equal(parsed, final_answer):
                 valid = True
-                message = "Correct final value repeated."
+                message = "Correct: aₙ = 4/n²."
 
         if not valid:
             all_valid = False
@@ -1479,7 +1500,7 @@ def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
             "step": idx + 1,
             "expression": step_text,
             "valid": valid,
-            "error": message or f"Step {idx+1} does not match expected derivation for aₙ.",
+            "error": message or "This step does not match a known pattern for the aₙ = 4/n² derivation.",
         })
 
     return {
@@ -1490,14 +1511,16 @@ def validate_fourier_an_steps(steps: list[str], problem_expr_str: str) -> dict:
 
 
 def validate_fourier_bn_steps(steps: list[str], problem_expr_str: str) -> dict:
-    """Strict step-by-step validator for finding bn of f(x)=x^2 on [0, 2pi].
+    """Non-positional validator for finding bₙ of f(x)=x² on [0, 2π].
 
-    Expected steps (from reference):
-      1. bn = (1/pi) * integral(0 to 2pi) f(x)sin(nx) dx       — formula
-      2. = (1/pi) * integral(0 to 2pi) x^2 sin(nx) dx           — substitution
-      3. = (1/pi)[x^2*(-cos(nx))/n - 2x*(-sin(nx))/n^2 + 2*(cos(nx))/n^3]_0^{2pi}  — IBP
-      4. = (1/pi)[-4pi^2/n - 0 + 2/n^3 - 0 - 0 - 2/n^3] = -4pi/n  — evaluate
-      5. bn = -4pi/n                                              — final
+    Accepts steps in any order / any number.  Each step is matched against all
+    known patterns for the bₙ derivation; a step is valid if it matches any of:
+      - bₙ formula setup (bₙ = (1/π)∫…sin(nx)dx)
+      - Substitution of f(x) = x²
+      - Explanatory prose
+      - IBP expansion (contains cos + sin + /n)
+      - Boundary evaluation (contains -4π²/n  or  -4π/n)
+      - Final answer -4π/n (symbolic or text match)
     """
     results = []
     all_valid = True
@@ -1509,64 +1532,68 @@ def validate_fourier_bn_steps(steps: list[str], problem_expr_str: str) -> dict:
         valid = False
         message = None
 
-        # Step 1: Formula — bn = (1/pi) integral f(x) sin(nx) dx
-        if idx == 0:
-            if ("bn" in lowered or "b_n" in lowered) and ("sin" in lowered) and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered or "∫" in raw):
-                valid = True
-                message = "Correct: bₙ formula setup with sin(nx)."
-            elif ("bn" in lowered or "b_n" in lowered) and "f(x)" in lowered and "sin" in lowered:
-                valid = True
-                message = "Correct: bₙ formula setup."
+        # Pattern A: bₙ formula setup — mentions bₙ/b_n + sin + integral notation
+        if (
+            ("bn" in lowered or "b_n" in lowered or "bₙ" in raw.lower())
+            and "sin" in lowered
+            and ("1/pi" in lowered or "1/π" in lowered or "integral" in lowered
+                 or "∫" in raw or "int" in lowered)
+        ):
+            valid = True
+            message = "Correct: bₙ formula setup with sin(nx)."
 
-        # Step 2: Substitute x^2 sin(nx)
-        elif idx == 1:
-            if ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and "sin" in lowered:
-                valid = True
-                message = "Correct: substituted f(x) = x² into the sine integral."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and expressions_equal(parsed, final_answer):
-                    valid = True
-                    message = "Correct bₙ value."
+        # Pattern B: formula without explicit integral keyword
+        elif (
+            ("bn" in lowered or "b_n" in lowered or "bₙ" in raw.lower())
+            and "f(x)" in lowered
+            and "sin" in lowered
+        ):
+            valid = True
+            message = "Correct: bₙ formula setup."
 
-        # Step 3: Integration by parts result
-        elif idx == 2:
-            if ("cos(n" in lowered or "cos(nx)" in lowered) and ("sin(n" in lowered or "sin(nx)" in lowered) and ("/n" in lowered):
-                valid = True
-                message = "Correct: integration by parts result for ∫x²sin(nx)dx."
-            elif "cos" in lowered and "sin" in lowered and "n^2" in lowered:
-                valid = True
-                message = "Correct: IBP expansion shown."
+        # Pattern C: substitution — x² + sin present
+        elif ("x^2" in lowered or "x**2" in lowered or "x²" in lowered) and "sin" in lowered:
+            valid = True
+            message = "Correct: substituted f(x) = x² into the bₙ integral."
 
-        # Step 4: Evaluate at limits → -4pi/n
-        elif idx == 3:
-            if ("-4pi^2/n" in lowered or "-4*pi**2/n" in lowered or "-4π²/n" in lowered):
-                valid = True
-                message = "Correct: evaluated boundary terms."
-            elif ("-4pi/n" in lowered or "-4*pi/n" in lowered or "-4π/n" in lowered):
-                valid = True
-                message = "Correct: simplified to -4π/n."
-            else:
-                parsed = parse_expression_candidate(raw)
-                if parsed is not None and expressions_equal(parsed, final_answer):
-                    valid = True
-                    message = "Correct evaluation step."
+        # Pattern D: explanatory / prose step
+        elif _is_explanatory_only(raw):
+            valid = True
+            message = "Accepted: explanatory step."
 
-        # Step 5: Final answer bn = -4pi/n
-        elif idx == 4:
-            parsed = parse_expression_candidate(raw)
-            if parsed is not None and expressions_equal(parsed, final_answer):
-                valid = True
-                message = "Correct: bₙ = -4π/n. ✓"
-            elif "-4pi/n" in lowered or "-4*pi/n" in lowered or "-4π/n" in lowered:
-                valid = True
-                message = "Correct: bₙ = -4π/n. ✓"
+        # Pattern E: IBP expansion — cos + sin + /n denominator terms
+        elif (
+            ("cos(n" in lowered or "cosnx" in lowered or "cos(nx)" in lowered)
+            and ("sin(n" in lowered or "sinnx" in lowered or "sin(nx)" in lowered)
+            and "/n" in lowered
+        ):
+            valid = True
+            message = "Correct: IBP antiderivative for ∫x²sin(nx)dx."
 
+        elif "cos" in lowered and "sin" in lowered and ("n^2" in lowered or "n**2" in lowered or "/n²" in lowered):
+            valid = True
+            message = "Correct: IBP expansion shown."
+
+        # Pattern F: boundary evaluation — -4π²/n intermediate
+        elif (
+            "-4pi^2/n" in lowered or "-4*pi^2/n" in lowered or "-4*pi**2/n" in lowered
+            or "-4π²/n" in lowered or "-4pi²/n" in lowered
+            or "-4*pi^2" in lowered
+        ):
+            valid = True
+            message = "Correct: boundary evaluation gives -4π²/n."
+
+        # Pattern G: final simplified form -4π/n
+        elif "-4pi/n" in lowered or "-4*pi/n" in lowered or "-4π/n" in lowered or "-4pi/n" in lowered:
+            valid = True
+            message = "Correct: bₙ = -4π/n. ✓"
+
+        # Pattern H: SymPy symbolic equality
         else:
             parsed = parse_expression_candidate(raw)
             if parsed is not None and expressions_equal(parsed, final_answer):
                 valid = True
-                message = "Correct final value repeated."
+                message = "Correct: bₙ = -4π/n."
 
         if not valid:
             all_valid = False
@@ -1574,7 +1601,7 @@ def validate_fourier_bn_steps(steps: list[str], problem_expr_str: str) -> dict:
             "step": idx + 1,
             "expression": step_text,
             "valid": valid,
-            "error": message or f"Step {idx+1} does not match expected derivation for bₙ.",
+            "error": message or "This step does not match a known pattern for the bₙ = -4π/n derivation.",
         })
 
     return {
@@ -2629,10 +2656,10 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
                  "detail": "aₙ = (1/π) ∫₀²π f(x)cos(nx) dx"},
                 {"step": 2, "title": "Substitute f(x) = x²",
                  "detail": "= (1/π) ∫₀²π x² cos(nx) dx"},
-                {"step": 3, "title": "Integration by parts",
-                 "detail": "= (1/π)[x²·sin(nx)/n − 2x·(−cos(nx))/n² + 2·(−sin(nx))/n³]₀²π"},
+                {"step": 3, "title": "Integration by parts (twice)",
+                 "detail": "= (1/π)[x²·sin(nx)/n + 2x·cos(nx)/n² − 2·sin(nx)/n³]₀²π"},
                 {"step": 4, "title": "Evaluate boundary terms",
-                 "detail": "= (1/π)[0 + 4π/n² + 0] = 4/n²"},
+                 "detail": "At x=2π: (2π)²·sin(2πn)/n + 2(2π)·cos(2πn)/n² − 2·sin(2πn)/n³ = 4π/n²; at x=0: 0 \u21d2 (1/π)(4π/n²) = 4/n²"},
                 {"step": 5, "title": "Final answer",
                  "detail": "aₙ = 4/n²"},
             ]
@@ -2643,10 +2670,10 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
                  "detail": "bₙ = (1/π) ∫₀²π f(x)sin(nx) dx"},
                 {"step": 2, "title": "Substitute f(x) = x²",
                  "detail": "= (1/π) ∫₀²π x² sin(nx) dx"},
-                {"step": 3, "title": "Integration by parts",
-                 "detail": "= (1/π)[x²·(−cos(nx))/n − 2x·(−sin(nx))/n² + 2·(cos(nx))/n³]₀²π"},
+                {"step": 3, "title": "Integration by parts (twice)",
+                 "detail": "= (1/π)[−x²·cos(nx)/n + 2x·sin(nx)/n² + 2·cos(nx)/n³]₀²π"},
                 {"step": 4, "title": "Evaluate boundary terms",
-                 "detail": "= (1/π)[−4π²/n − 0 + 2/n³ − 0 − 0 − 2/n³] = −4π/n"},
+                 "detail": "At x=2π: −4π²/n + 0 + 2/n³; at x=0: 0 + 0 + 2/n³ \u21d2 (1/π)(−4π²/n) = −4π/n"},
                 {"step": 5, "title": "Final answer",
                  "detail": "bₙ = −4π/n"},
             ]

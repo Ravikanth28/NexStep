@@ -10,6 +10,7 @@ import {
   stopSpeech,
   pauseSpeech,
   resumeSpeech,
+  speechToLatex,
 } from '../utils/mathSpeech';
 
 function formatTime(seconds) {
@@ -47,8 +48,14 @@ export default function SolvePage() {
   const [speaking, setSpeaking] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speechReady, setSpeechReady] = useState(false);
+  const [voiceLang, setVoiceLang] = useState('en-IN');
+  const [voiceSpeaker, setVoiceSpeaker] = useState('ritu');
+  const [isRecording, setIsRecording] = useState(false);
+  const [micLoading, setMicLoading] = useState(false);
   const speechScriptRef = useRef('');
   const insertFromKeyboardRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   useEffect(() => {
     loadQuestion();
@@ -62,7 +69,7 @@ export default function SolvePage() {
     return () => clearInterval(interval);
   }, [timerActive]);
 
-  // Auto-play audio explanation when validation results arrive
+  // Build explanation script when results arrive — user clicks Explain to play
   useEffect(() => {
     if (!verdict || !question) return;
     const script = buildExplanationScript({
@@ -77,13 +84,8 @@ export default function SolvePage() {
     });
     speechScriptRef.current = script;
     setSpeechReady(true);
-    setSpeaking(true);
+    setSpeaking(false);
     setSpeechPaused(false);
-    speak(script, {
-      onStart: () => { setSpeaking(true); setSpeechPaused(false); },
-      onEnd: () => { setSpeaking(false); setSpeechPaused(false); },
-      onError: () => { setSpeaking(false); setSpeechPaused(false); },
-    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verdict]);
 
@@ -100,6 +102,8 @@ export default function SolvePage() {
     } else if (!speaking && speechScriptRef.current) {
       setSpeaking(true);
       speak(speechScriptRef.current, {
+        language: voiceLang,
+        speaker: voiceSpeaker,
         onStart: () => { setSpeaking(true); setSpeechPaused(false); },
         onEnd: () => { setSpeaking(false); setSpeechPaused(false); },
         onError: () => { setSpeaking(false); setSpeechPaused(false); },
@@ -224,6 +228,58 @@ export default function SolvePage() {
       setStepHints((prev) => ({ ...prev, [stepIndex]: 'Could not get hint right now.' }));
     } finally {
       setLoadingHintIndex(null);
+    }
+  };
+
+  const handleMicInput = async () => {
+    if (isRecording) {
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    // Start recording
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setMicLoading(true);
+        try {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append('file', blob, 'recording.webm');
+
+          const res = await fetch('/api/voice/stt', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error(`STT failed: ${res.status}`);
+          const { transcript } = await res.json();
+          if (transcript && insertFromKeyboardRef.current) {
+            // Convert spoken math to LaTeX before inserting
+            const latex = speechToLatex(transcript);
+            insertFromKeyboardRef.current(latex);
+          }
+        } catch (err) {
+          console.error('STT error:', err);
+        } finally {
+          setMicLoading(false);
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      if (!timerActive) setTimerActive(true);
+    } catch (err) {
+      console.error('Mic access denied:', err);
     }
   };
 
@@ -391,6 +447,20 @@ export default function SolvePage() {
                 <button className="btn btn-outline" onClick={handleGetHint} disabled={hintLoading}>
                   {hintLoading ? '...' : 'AI Hint'}
                 </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={handleMicInput}
+                  disabled={micLoading}
+                  title={isRecording ? 'Stop recording' : 'Speak your step (STT)'}
+                  style={{
+                    padding: '10px 14px',
+                    borderColor: isRecording ? '#ff4444' : micLoading ? 'var(--accent-primary)' : undefined,
+                    color: isRecording ? '#ff4444' : micLoading ? 'var(--accent-primary)' : undefined,
+                    animation: isRecording ? 'pulse 1s ease-in-out infinite' : undefined,
+                  }}
+                >
+                  {micLoading ? '⏳' : isRecording ? '⏹ Stop' : '🎙'}
+                </button>
               </div>
 
               {(hint || hintFormulas.length > 0) && (
@@ -492,16 +562,15 @@ export default function SolvePage() {
                       background: speaking ? 'rgba(0,242,255,0.04)' : 'rgba(255,255,255,0.02)',
                       transition: 'border-color 0.3s',
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <div>
                           <div className="telemetry-card-label" style={{ color: speaking ? 'var(--accent-primary)' : speechPaused ? '#f0c040' : 'var(--text-muted)' }}>
                             Audio Explanation
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                            {speaking ? 'Playing solution walkthrough…' : speechPaused ? 'Paused' : 'Ready to replay'}
+                            {speaking ? 'Playing solution walkthrough…' : speechPaused ? 'Paused' : 'Click Explain to hear the solution'}
                           </div>
                         </div>
-                        {/* Animated waveform when speaking */}
                         {speaking && (
                           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '20px' }}>
                             {[1, 2, 3, 4, 3, 2].map((h, i) => (
@@ -516,6 +585,64 @@ export default function SolvePage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Voice & Language selectors */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.07em', marginBottom: '4px' }}>LANGUAGE</div>
+                          <select
+                            value={voiceLang}
+                            onChange={(e) => setVoiceLang(e.target.value)}
+                            disabled={speaking}
+                            style={{
+                              width: '100%',
+                              background: '#111827',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '6px',
+                              color: 'white',
+                              fontSize: '0.78rem',
+                              padding: '5px 8px',
+                              cursor: 'pointer',
+                              colorScheme: 'dark',
+                            }}
+                          >
+                            <option value="en-IN">English (India)</option>
+                            <option value="ta-IN">Tamil</option>
+                            <option value="hi-IN">Hindi</option>
+                            <option value="te-IN">Telugu</option>
+                            <option value="kn-IN">Kannada</option>
+                            <option value="ml-IN">Malayalam</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.07em', marginBottom: '4px' }}>VOICE</div>
+                          <select
+                            value={voiceSpeaker}
+                            onChange={(e) => setVoiceSpeaker(e.target.value)}
+                            disabled={speaking}
+                            style={{
+                              width: '100%',
+                              background: '#111827',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '6px',
+                              color: 'white',
+                              fontSize: '0.78rem',
+                              padding: '5px 8px',
+                              cursor: 'pointer',
+                              colorScheme: 'dark',
+                            }}
+                          >
+                            <option value="ritu">Ritu (Female)</option>
+                            <option value="priya">Priya (Female)</option>
+                            <option value="neha">Neha (Female)</option>
+                            <option value="pooja">Pooja (Female)</option>
+                            <option value="rahul">Rahul (Male)</option>
+                            <option value="aditya">Aditya (Male)</option>
+                            <option value="rohan">Rohan (Male)</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div style={{ display: 'flex', gap: '8px' }}>
                         {speaking ? (
                           <button
@@ -531,7 +658,7 @@ export default function SolvePage() {
                             style={{ flex: 1, justifyContent: 'center', padding: '8px 12px', fontSize: '0.8rem', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
                             onClick={handleSpeechPlay}
                           >
-                            ▶ {speechPaused ? 'Resume' : 'Replay'}
+                            ▶ {speechPaused ? 'Resume' : 'Explain'}
                           </button>
                         )}
                         <button
