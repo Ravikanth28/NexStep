@@ -46,10 +46,6 @@ def _call_nvidia_sync(prompt: str, system_instruction: str = "") -> Optional[str
                 temperature=1,
                 top_p=1,
                 max_tokens=16384,
-                extra_body={
-                    "reasoning_budget": 16384,
-                    "chat_template_kwargs": {"enable_thinking": True},
-                },
                 stream=True,
             )
 
@@ -85,7 +81,7 @@ async def call_cerebras(prompt: str, system_instruction: str = "") -> Optional[s
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama3.1-70b",
+                    "model": "qwen-3-235b-a22b-instruct-2507",
                     "messages": [
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": prompt}
@@ -232,6 +228,15 @@ CRITICAL RULES — read carefully:
 6. The verdict is "Incorrect" if any step has a real mathematical error or the final answer is wrong.
 7. Use "Needs Review" only when the approach is genuinely ambiguous.
 8. Set "correct_answer" in the response to the value from the input payload's correct_answer field.
+
+ADDITIONAL OVERRIDE FOR TEMPLATE-ONLY QUESTIONS:
+- If correct_answer is null, the reference_steps are only a guide/template, not an answer key.
+- In that case, independently check the problem text and the student's final answer.
+- Do not mark a wrong final answer correct merely because the template structure is followed.
+- For probability word problems, verify counts carefully. A standard deck has 52 cards and 4 kings; one fair die has outcomes {1,2,3,4,5,6}; one fair coin has outcomes {Heads,Tails}.
+- Evaluate every submitted line, not only the first error. If a later line uses an earlier incorrect value
+  (for example n(A)=5 for kings, then P(A)=5/52), mark that later line invalid too.
+- If correct_answer is null, keep correct_answer null in your JSON response.
 
 Return ONLY valid JSON — no markdown, no explanation, nothing outside the JSON:
 {

@@ -148,12 +148,12 @@ export default function MathKeyboard({ onInsert }) {
 
   return (
     <div className="math-keyboard">
-      <div style={{ padding: '20px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-main)' }}>
+      <div style={{ padding: '20px 24px', background: 'rgba(240,246,255,0.70)', borderBottom: '1px solid rgba(46,60,181,0.12)' }}>
         <div style={{ color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Notation Center</div>
-        <h3 style={{ fontSize: '1rem', margin: 0 }}>Fast Symbolic Tools</h3>
+        <h3 style={{ fontSize: '1rem', margin: 0, color: '#0a1628' }}>Fast Symbolic Tools</h3>
       </div>
 
-      <div className="keyboard-tabs" style={{ padding: '8px 24px', background: 'rgba(255,255,255,0.01)', borderBottom: '1px solid var(--border-main)', display: 'flex', gap: '8px', overflowX: 'auto' }}>
+      <div className="keyboard-tabs" style={{ padding: '8px 24px', background: 'rgba(240,246,255,0.60)', borderBottom: '1px solid rgba(46,60,181,0.12)', display: 'flex', gap: '8px', overflowX: 'auto' }}>
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -161,9 +161,9 @@ export default function MathKeyboard({ onInsert }) {
             onClick={(e) => { e.preventDefault(); setActiveTab(tab); }}
             type="button"
             style={{ 
-              background: activeTab === tab ? 'var(--accent-primary)' : 'transparent',
-              color: activeTab === tab ? 'var(--bg-darker)' : 'var(--text-secondary)',
-              border: 'none',
+              background: activeTab === tab ? 'var(--accent-primary)' : 'rgba(255,255,255,0.80)',
+              color: activeTab === tab ? 'white' : '#3a4a6b',
+              border: activeTab === tab ? 'none' : '1px solid rgba(46,60,181,0.20)',
               padding: '6px 16px',
               borderRadius: '99px',
               fontSize: '0.65rem',
@@ -179,14 +179,14 @@ export default function MathKeyboard({ onInsert }) {
       </div>
 
       {activeTab === 'Transforms' && (
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(0,229,190,0.03)' }}>
-          <div style={{ fontSize: '0.62rem', color: '#00e5be', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>FOURIER COEFFICIENTS</div>
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid rgba(46,60,181,0.12)', background: 'rgba(240,246,255,0.60)' }}>
+          <div style={{ fontSize: '0.62rem', color: '#2e3cb5', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>FOURIER COEFFICIENTS</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
             <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Interval:</label>
             <select
               value={fourierInterval}
               onChange={(e) => setFourierInterval(e.target.value)}
-              style={{ padding: '4px 8px', borderRadius: '6px', background: '#0e1628', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.78rem', cursor: 'pointer' }}
+              style={{ padding: '4px 8px', borderRadius: '6px', background: 'white', border: '1px solid rgba(46,60,181,0.25)', color: '#0a1628', fontSize: '0.78rem', cursor: 'pointer' }}
             >
               <option value="0_2pi" style={{ background: '#0e1628', color: 'white' }}>(0, 2π)</option>
               <option value="neg_pi_pi" style={{ background: '#0e1628', color: 'white' }}>(-π, π)</option>
@@ -195,30 +195,30 @@ export default function MathKeyboard({ onInsert }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button type="button"
               onClick={(e) => { e.preventDefault(); onInsert(`a_0 = \\frac{1}{\\pi}\\int_{${fi.lower}}^{${fi.upper}} f(x)\\,dx`); }}
-              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #00e5be', background: 'rgba(0,229,190,0.08)', color: '#00e5be', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(46,60,181,0.35)', background: 'rgba(46,60,181,0.08)', color: '#2e3cb5', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
             >a₀</button>
             <button type="button"
               onClick={(e) => { e.preventDefault(); onInsert(`a_n = \\frac{1}{\\pi}\\int_{${fi.lower}}^{${fi.upper}} f(x)\\cos nx\\,dx`); }}
-              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #00e5be', background: 'rgba(0,229,190,0.08)', color: '#00e5be', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(46,60,181,0.35)', background: 'rgba(46,60,181,0.08)', color: '#2e3cb5', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
             >aₙ</button>
             <button type="button"
               onClick={(e) => { e.preventDefault(); onInsert(`b_n = \\frac{1}{\\pi}\\int_{${fi.lower}}^{${fi.upper}} f(x)\\sin nx\\,dx`); }}
-              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #00e5be', background: 'rgba(0,229,190,0.08)', color: '#00e5be', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(46,60,181,0.35)', background: 'rgba(46,60,181,0.08)', color: '#2e3cb5', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
             >bₙ</button>
             <button type="button"
               onClick={(e) => { e.preventDefault(); onInsert(`f(x) = \\frac{a_0}{2} + \\sum_{n=1}^{\\infty} a_n \\cos nx + \\sum_{n=1}^{\\infty} b_n \\sin nx`); }}
-              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(0,229,190,0.4)', background: 'rgba(0,229,190,0.05)', color: '#00e5be', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(46,60,181,0.25)', background: 'rgba(46,60,181,0.05)', color: '#2e3cb5', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >f(x) series</button>
             <button type="button"
               onClick={(e) => { e.preventDefault(); onInsert(`\\int u\\,dv = uv - u'v_1 + u''v_2 - u'''v_3 + \\cdots`); }}
-              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #f0a500', background: 'rgba(240,165,0,0.08)', color: '#f0a500', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid rgba(46,60,181,0.35)', background: 'rgba(46,60,181,0.08)', color: '#2e3cb5', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >Bernoulli ∫</button>
           </div>
         </div>
       )}
 
       {activeTab === 'Calculus' && (
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(94,160,255,0.04)' }}>
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid rgba(46,60,181,0.12)', background: 'rgba(240,246,255,0.60)' }}>
           <div style={{ fontSize: '0.62rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>CUSTOM LIMITS</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -228,7 +228,7 @@ export default function MathKeyboard({ onInsert }) {
                 value={lowerLimit}
                 onChange={(e) => setLowerLimit(e.target.value)}
                 placeholder="0"
-                style={{ width: '56px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+                style={{ width: '56px', padding: '4px 8px', borderRadius: '6px', background: 'white', border: '1px solid rgba(46,60,181,0.25)', color: '#0a1628', fontSize: '0.85rem', textAlign: 'center' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -238,7 +238,7 @@ export default function MathKeyboard({ onInsert }) {
                 value={upperLimit}
                 onChange={(e) => setUpperLimit(e.target.value)}
                 placeholder="\infty"
-                style={{ width: '56px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+                style={{ width: '56px', padding: '4px 8px', borderRadius: '6px', background: 'white', border: '1px solid rgba(46,60,181,0.25)', color: '#0a1628', fontSize: '0.85rem', textAlign: 'center' }}
               />
             </div>
             <button
@@ -274,7 +274,7 @@ export default function MathKeyboard({ onInsert }) {
       )}
 
       {activeTab === 'Matrices' && (
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(94,160,255,0.04)' }}>
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid rgba(46,60,181,0.12)', background: 'rgba(240,246,255,0.60)' }}>
           <div style={{ fontSize: '0.62rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>CUSTOM MATRIX SIZE</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -285,7 +285,7 @@ export default function MathKeyboard({ onInsert }) {
                 max={6}
                 value={matrixRows}
                 onChange={(e) => setMatrixRows(Number(e.target.value))}
-                style={{ width: '48px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+                style={{ width: '48px', padding: '4px 8px', borderRadius: '6px', background: 'white', border: '1px solid rgba(46,60,181,0.25)', color: '#0a1628', fontSize: '0.85rem', textAlign: 'center' }}
               />
             </div>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>×</span>
@@ -297,7 +297,7 @@ export default function MathKeyboard({ onInsert }) {
                 max={6}
                 value={matrixCols}
                 onChange={(e) => setMatrixCols(Number(e.target.value))}
-                style={{ width: '48px', padding: '4px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-main)', color: 'white', fontSize: '0.85rem', textAlign: 'center' }}
+                style={{ width: '48px', padding: '4px 8px', borderRadius: '6px', background: 'white', border: '1px solid rgba(46,60,181,0.25)', color: '#0a1628', fontSize: '0.85rem', textAlign: 'center' }}
               />
             </div>
             <button
@@ -329,13 +329,14 @@ export default function MathKeyboard({ onInsert }) {
             onClick={(e) => { e.preventDefault(); onInsert(sym.insert); }}
             type="button"
             style={{ 
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid var(--border-main)',
+              background: 'white',
+              border: '1px solid rgba(46,60,181,0.30)',
               borderRadius: '8px',
               padding: '10px 4px',
-              color: 'white',
+              color: '#1e293b',
               fontSize: '0.85rem',
               fontFamily: 'JetBrains Mono',
+              fontWeight: 700,
               cursor: 'pointer',
               transition: 'all 0.1s ease',
               display: 'flex',

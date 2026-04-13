@@ -6,6 +6,7 @@ import {
   createQuestion,
   deleteQuestion,
   downloadTeacherReport,
+  formatNaturalQuestion,
   getQuestionAnswer,
   getQuestions,
   getSyllabusMeta,
@@ -59,6 +60,8 @@ export default function TeacherDashboard() {
   const [builderItems, setBuilderItems] = useState([]);
   const [customBuilderToken, setCustomBuilderToken] = useState('');
   const [imageParseLoading, setImageParseLoading] = useState(false);
+  const [naturalQuestion, setNaturalQuestion] = useState('');
+  const [formattingNatural, setFormattingNatural] = useState(false);
   const imageInputRef = useRef(null);
   const mathFieldRef = useRef(null);
   useEffect(() => {
@@ -205,7 +208,14 @@ export default function TeacherDashboard() {
       const raw = form.problem_image.split(',')[1] ?? form.problem_image;
       const result = await parseExpressionImage(raw);
       if (result.expression) {
-        updateField('problem_expr', result.expression);
+        setForm(f => ({
+          ...f,
+          problem_expr: result.expression,
+          title: result.title || f.title,
+          topic: result.topic || f.topic,
+          difficulty: result.difficulty || f.difficulty,
+          problem_type: result.problem_type || f.problem_type,
+        }));
       } else {
         setFormError(result.error || 'Could not extract expression from image.');
       }
@@ -213,6 +223,41 @@ export default function TeacherDashboard() {
       setFormError(err.message);
     } finally {
       setImageParseLoading(false);
+    }
+  };
+
+  const handleFormatNaturalQuestion = async () => {
+    const question = naturalQuestion.trim();
+    if (!question) {
+      setFormError('Enter a natural-language question first.');
+      return;
+    }
+
+    setFormattingNatural(true);
+    setFormError('');
+    setFormSuccess('');
+    try {
+      const result = await formatNaturalQuestion(question);
+      const fields = result.fields || {};
+      setForm((current) => ({
+        ...current,
+        title: fields.title || current.title,
+        problem_expr: fields.problem_expr || question,
+        difficulty: fields.difficulty || current.difficulty,
+        topic: fields.topic || current.topic,
+        subject: fields.subject || current.subject,
+        unit_name: fields.unit_name || current.unit_name,
+        problem_type: fields.problem_type || current.problem_type,
+        concept_tags: Array.isArray(fields.concept_tags) ? fields.concept_tags : current.concept_tags,
+        hints: Array.isArray(fields.hints) && fields.hints.length ? fields.hints : current.hints,
+        allow_copy_paste: fields.allow_copy_paste ?? current.allow_copy_paste,
+      }));
+      setBuilderItems([]);
+      setFormSuccess(result.source === 'ai' ? 'Question fields formatted by AI.' : 'Question fields formatted locally.');
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setFormattingNatural(false);
     }
   };
 
@@ -259,7 +304,9 @@ export default function TeacherDashboard() {
       setForm(DEFAULT_FORM);
       setAnalysis(null);
       setBuilderItems([]);
-      setCustomBuilderToken('');      await loadData();
+      setCustomBuilderToken('');
+      setNaturalQuestion('');
+      await loadData();
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -329,7 +376,7 @@ export default function TeacherDashboard() {
             </div>
           </div>
           
-          <div className="card" style={{ padding: '32px', background: 'rgba(0,0,0,0.4)', borderColor: 'var(--accent-secondary)' }}>
+          <div className="card" style={{ padding: '32px', background: 'rgba(255,255,255,0.88)', borderColor: 'rgba(46,60,181,0.15)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>QUESTIONS</div>
@@ -455,6 +502,31 @@ export default function TeacherDashboard() {
                 {formSuccess && <div className="badge badge-solved" style={{ width: '100%', marginBottom: '24px', padding: '12px', textAlign: 'center' }}>{formSuccess}</div>}
 
                 <div className="form-group">
+                  <label>Natural Language Question</label>
+                  <textarea
+                    value={naturalQuestion}
+                    onChange={(e) => setNaturalQuestion(e.target.value)}
+                    placeholder="Example: A coin is tossed once. What is the probability of getting heads?"
+                    rows={3}
+                    style={{ minHeight: '96px' }}
+                  />
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleFormatNaturalQuestion}
+                      disabled={formattingNatural}
+                      style={{ padding: '10px 18px', fontSize: '0.85rem' }}
+                    >
+                      {formattingNatural ? <div className="spinner" style={{ width: 16, height: 16 }}></div> : 'Format Fields'}
+                    </button>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      AI fills fields only; validation still uses the local engine first.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="form-group">
                   <label>Curriculum Title</label>
                   <input
                     value={form.title}
@@ -474,7 +546,7 @@ export default function TeacherDashboard() {
                       padding: '16px',
                       border: '1px solid var(--border-main)',
                       borderRadius: '14px',
-                      background: 'rgba(255,255,255,0.02)',
+                      background: 'rgba(240,248,255,0.70)',
                     }}>
                       {BUILDER_LIBRARY.map((block) => (
                         <button
@@ -492,9 +564,9 @@ export default function TeacherDashboard() {
                           style={{
                             padding: '10px 12px',
                             borderRadius: '10px',
-                            border: '1px solid var(--border-main)',
-                            background: 'rgba(12,17,30,0.92)',
-                            color: 'white',
+                            border: '1px solid rgba(46,60,181,0.20)',
+                            background: 'rgba(240,248,255,0.90)',
+                            color: '#0a1628',
                             textAlign: 'left',
                             cursor: 'grab',
                             fontWeight: 700,
@@ -512,8 +584,8 @@ export default function TeacherDashboard() {
                         minHeight: '96px',
                         padding: '16px',
                         borderRadius: '14px',
-                        border: '1px dashed var(--accent-primary)',
-                        background: 'rgba(94, 160, 255, 0.05)',
+                        border: '1px dashed rgba(46,60,181,0.35)',
+                        background: 'rgba(224,234,255,0.40)',
                       }}
                     >
                       <div style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '12px' }}>
@@ -572,15 +644,15 @@ export default function TeacherDashboard() {
                     style={{
                       width: '100%',
                       display: 'block',
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid var(--accent-primary)',
+                      background: '#ffffff',
+                      border: '1px solid rgba(46,60,181,0.30)',
                       borderRadius: '8px',
                       padding: '10px 14px',
                       fontSize: '1.1rem',
-                      color: 'white',
+                      color: '#0a1628',
                       minHeight: '62px',
-                      '--caret-color': '#00e5be',
-                      '--selection-background-color': 'rgba(0,229,190,0.25)',
+                      '--caret-color': '#2e3cb5',
+                      '--selection-background-color': 'rgba(46,60,181,0.18)',
                       '--text-font-family': 'JetBrains Mono',
                     }}
                   />
@@ -590,7 +662,7 @@ export default function TeacherDashboard() {
                 </div>
 
                 {/* Image upload for expression */}
-                <div style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--border-main)', borderRadius: '14px', background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ marginTop: '24px', padding: '20px', border: '1px solid var(--border-main)', borderRadius: '14px', background: 'rgba(240,248,255,0.65)' }}>
                   <div style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '14px' }}>
                     EXPRESSION IMAGE (Optional)
                   </div>
@@ -675,7 +747,7 @@ export default function TeacherDashboard() {
             </div>
 
             <div style={{ display: 'grid', gap: '24px', alignContent: 'start' }}>
-              <div className="card" style={{ padding: '32px', background: 'rgba(0,0,0,0.4)' }}>
+              <div className="card" style={{ padding: '32px', background: 'rgba(255,255,255,0.90)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
                   <div className="hero-kicker" style={{ fontSize: '0.65rem', margin: 0 }}>AI Analysis Preview</div>
                   <div className={`badge ${analyzing ? 'badge-medium' : 'badge-solved'}`} style={{ fontSize: '0.6rem' }}>{analyzing ? 'Processing' : 'Active'}</div>

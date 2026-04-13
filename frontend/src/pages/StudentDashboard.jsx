@@ -16,20 +16,19 @@ function MasteryHeatmap({ mastery }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
       {categories.map(cat => (
-        <div key={cat} style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-main)' }}>
+        <div key={cat} style={{ background: 'rgba(46,60,181,0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(46,60,181,0.12)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{cat.toUpperCase()}</span>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: mastery[cat] > 80 ? 'var(--accent-success)' : mastery[cat] > 50 ? 'var(--accent-warning)' : 'var(--accent-danger)' }}>
               {mastery[cat]}%
             </span>
           </div>
-          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: '6px', background: 'rgba(210,230,248,0.80)', borderRadius: '3px', overflow: 'hidden' }}>
             <div 
               style={{ 
                 width: `${mastery[cat]}%`, 
                 height: '100%', 
-                background: mastery[cat] > 80 ? 'var(--accent-success)' : mastery[cat] > 50 ? 'var(--accent-warning)' : 'var(--accent-danger)',
-                boxShadow: `0 0 10px ${mastery[cat] > 80 ? 'var(--accent-success)' : 'var(--accent-warning)'}`
+                background: mastery[cat] > 80 ? 'var(--accent-success)' : mastery[cat] > 50 ? 'var(--accent-warning)' : 'var(--accent-danger)'
               }} 
             />
           </div>
@@ -105,14 +104,14 @@ export default function StudentDashboard() {
                 <span>XP: {dashboard.overview.xp % 1000} / 1000</span>
                 <span>TOTAL: {dashboard.overview.xp}</span>
               </div>
-              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', border: '1px solid var(--border-main)' }}>
-                <div style={{ width: `${(dashboard.overview.xp % 1000) / 10}%`, height: '100%', background: 'var(--accent-primary)', borderRadius: '4px', boxShadow: '0 0 15px var(--accent-primary)' }} />
+              <div style={{ width: '100%', height: '8px', background: 'rgba(210,230,248,0.60)', borderRadius: '4px', border: '1px solid var(--border-main)' }}>
+                <div style={{ width: `${(dashboard.overview.xp % 1000) / 10}%`, height: '100%', background: '#2e3cb5', borderRadius: '4px' }} />
               </div>
             </div>
           </div>
           
-          <div className="card" style={{ padding: '32px', background: 'rgba(5, 8, 17, 0.6)', border: '1px solid var(--accent-primary)', position: 'relative' }}>
-             <h3 style={{ fontSize: '0.85rem', marginBottom: '20px', color: 'var(--accent-primary)', fontWeight: 800 }}>CONCEPTUAL HEATMAP</h3>
+          <div className="card" style={{ padding: '32px', background: 'rgba(255,255,255,0.88)', border: '1px solid rgba(46,60,181,0.15)', position: 'relative' }}>
+             <h3 style={{ fontSize: '0.85rem', marginBottom: '20px', color: '#2e3cb5', fontWeight: 800 }}>CONCEPTUAL HEATMAP</h3>
              <MasteryHeatmap mastery={dashboard.mastery} />
           </div>
         </section>
@@ -139,7 +138,7 @@ export default function StudentDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '40px' }}>
           <main>
             <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-              <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(240,248,255,0.60)' }}>
                 <h3 style={{ fontSize: '0.9rem', margin: 0 }}>Digital Performance Ledger</h3>
                 <div className="badge badge-easy" style={{ fontSize: '0.55rem' }}>SYNCHRONIZED</div>
               </div>
@@ -180,7 +179,7 @@ export default function StudentDashboard() {
 
           <aside>
             <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-              <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-main)', background: 'rgba(255,255,255,0.02)' }}>
+              <div style={{ padding: '24px', borderBottom: '1px solid var(--border-main)', background: 'rgba(240,248,255,0.60)' }}>
                 <h3 style={{ fontSize: '0.9rem', margin: 0 }}>Recent Transmissions</h3>
               </div>
               <div style={{ padding: '24px', maxHeight: '600px', overflowY: 'auto' }}>
@@ -191,7 +190,7 @@ export default function StudentDashboard() {
                   </div>
                 ) : (
                   dashboard.recent_submissions.map((s) => (
-                    <div key={s.id} className="stat-card" style={{ padding: '20px', margin: '0 0 16px 0', background: 'rgba(255,255,255,0.01)' }}>
+                    <div key={s.id} className="stat-card" style={{ padding: '20px', margin: '0 0 16px 0', background: 'rgba(246,250,255,0.90)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                         <div style={{ fontSize: '0.8rem', fontWeight: 800 }}>{s.question_title}</div>
                         <div style={{ fontWeight: 800, color: s.is_correct ? 'var(--accent-success)' : 'var(--accent-danger)' }}>{Math.round(s.score)}%</div>

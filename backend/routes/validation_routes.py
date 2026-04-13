@@ -7,7 +7,7 @@ from typing import Optional
 from database import get_db
 from models import Question, Submission, StepLog, User
 from auth import get_current_user
-from validation_engine import build_learning_feedback, validate_steps, get_hint, compute_correct_answer, generate_solution_steps
+from validation_engine import build_learning_feedback, validate_steps, get_hint, compute_correct_answer, generate_solution_steps, infer_problem_type
 from syllabus_engine import build_validation_notes, analyze_question_text, deserialize_concept_tags
 from ai_engine import evaluate_student_solution
 
@@ -71,6 +71,63 @@ def _latex_to_sympy_str(latex: str) -> str:
             return latex
 
 
+def _needs_ai_evaluation(result: dict | None) -> bool:
+    """Return True only when local validation could not meaningfully evaluate."""
+    if not result or not result.get("steps"):
+        return True
+    if result.get("verdict") == "Correct":
+        return False
+
+    unsupported_markers = (
+        "not in a supported pattern",
+        "not yet available",
+        "could not parse",
+        "unable to compute",
+    )
+    for step in result.get("steps", []):
+        message = " ".join(
+            str(step.get(key) or "")
+            for key in ("error", "feedback")
+        ).lower()
+        if any(marker in message for marker in unsupported_markers):
+            return True
+    return False
+
+
+def _normalize_probability_text(text: str) -> str:
+    return _re.sub(r"\s+", "", (text or "").lower())
+
+
+def _probability_postcheck(result: dict, problem_text: str) -> dict:
+    """Catch simple probability count contradictions that AI may under-propagate."""
+    lowered_problem = (problem_text or "").lower()
+    if not result or "probability" not in lowered_problem:
+        return result
+
+    is_king_deck = "king" in lowered_problem and any(token in lowered_problem for token in ["card", "deck"])
+    if not is_king_deck:
+        return result
+
+    saw_bad_king_count = False
+    for step in result.get("steps", []):
+        compact = _normalize_probability_text(step.get("expression", ""))
+        if any(token in compact for token in ["n(a)=5", "favorableoutcomes=5", "favourableoutcomes=5", "5kings"]):
+            saw_bad_king_count = True
+            step["valid"] = False
+            step["error"] = "A standard deck has 4 kings, not 5."
+
+    if saw_bad_king_count:
+        for step in result.get("steps", []):
+            compact = _normalize_probability_text(step.get("expression", ""))
+            if any(token in compact for token in ["5/52", "=0.096", "=0.0961"]):
+                step["valid"] = False
+                step["error"] = "This final probability uses the incorrect count of 5 kings."
+        result["verdict"] = "Incorrect"
+        result["overall_feedback"] = "Recheck the favorable-outcome count; later probability steps must use the corrected count."
+
+    return result
+
+
 class ValidateRequest(BaseModel):
     question_id: int
     steps: list[str]
@@ -113,38 +170,63 @@ async def validate_solution(
 
     # Validate steps using SymPy engine
     analysis = analyze_question_text(question.title, question.problem_expr, question.topic)
-    strategy = question.validation_strategy or question.problem_type or analysis.strategy
+    # evaluation_strategy is the AI evaluation mode (e.g. "ai_against_sympy_reference")
+    # problem_type is the math domain (e.g. "integral", "series", "ode") used by SymPy
+    evaluation_strategy = question.validation_strategy or question.problem_type or analysis.strategy
+    problem_type = question.problem_type or analysis.strategy or infer_problem_type(question.problem_expr or "")
     solution_steps = generate_solution_steps(
         question.problem_expr,
-        strategy,
+        problem_type,
     )
     correct_answer = compute_correct_answer(
         question.problem_expr,
-        strategy,
+        problem_type,
     )
 
-    result = await evaluate_student_solution(
-        problem=question.problem_expr,
-        student_steps=original_latex_steps,  # send readable LaTeX to AI
-        reference_steps=solution_steps,
-        correct_answer=correct_answer,
-        strategy=strategy,
-    )
+    template_only_reference = correct_answer is None
+    result = None
+    evaluation_mode = "symbolic_fallback"
 
-    # SymPy validator is only a last-resort fallback when AI is completely unavailable.
-    # AI handles all strategies so different valid approaches are accepted.
-    if not result:
+    if template_only_reference:
+        # When the reference engine only has a template/no answer key, AI should
+        # evaluate the student's actual reasoning first.
+        ai_result = await evaluate_student_solution(
+            problem=question.problem_expr,
+            student_steps=original_latex_steps,  # send readable LaTeX to AI
+            reference_steps=solution_steps,
+            correct_answer=correct_answer,
+            strategy=evaluation_strategy,
+        )
+        if ai_result:
+            result = ai_result
+            evaluation_mode = "ai_against_template"
+
+    if result is None:
         result = validate_steps(
             req.steps,
             question.problem_expr,
-            strategy,
+            problem_type,
         )
         if "correct_answer" not in result or result.get("correct_answer") is None:
             result["correct_answer"] = correct_answer
 
+        if not template_only_reference and _needs_ai_evaluation(result):
+            ai_result = await evaluate_student_solution(
+                problem=question.problem_expr,
+                student_steps=original_latex_steps,  # send readable LaTeX to AI
+                reference_steps=solution_steps,
+                correct_answer=correct_answer,
+                strategy=evaluation_strategy,
+            )
+            if ai_result:
+                result = ai_result
+                evaluation_mode = "ai_against_sympy_reference"
+
     # Always trust the SymPy-computed correct_answer over whatever the AI returned
     if correct_answer:
         result["correct_answer"] = correct_answer
+
+    result = _probability_postcheck(result, question.problem_expr)
 
     # Save submission
     is_correct = result["verdict"] == "Correct"
@@ -199,14 +281,14 @@ async def validate_solution(
         "feedback": build_learning_feedback(
             result,
             question.topic or analysis.topic,
-            strategy,
+            problem_type,
         ),
         "question_analysis": {
             "subject": question.subject or analysis.subject,
             "topic": question.topic or analysis.topic,
             "unit_name": question.unit_name or analysis.unit_name,
-            "problem_type": question.problem_type or strategy,
-            "validation_strategy": question.validation_strategy or strategy,
+            "problem_type": question.problem_type or problem_type,
+            "validation_strategy": question.validation_strategy or evaluation_strategy,
             "concept_tags": deserialize_concept_tags(question.concept_tags) or analysis.concept_tags,
             "analysis_confidence": question.analysis_confidence or analysis.confidence,
             "notes": build_validation_notes(analysis),
@@ -218,7 +300,7 @@ async def validate_solution(
             "leveled_up": leveled_up
         },
         "solution_steps": solution_steps,
-        "evaluation_mode": "ai_against_sympy_reference" if result.get("overall_feedback") is not None else "symbolic_fallback",
+        "evaluation_mode": evaluation_mode,
         "overall_feedback": result.get("overall_feedback"),
     }
 

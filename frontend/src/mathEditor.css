@@ -10,8 +10,8 @@
 
 .keyboard-tabs {
   display: flex;
-  background: rgba(255,255,255,0.02);
-  border-bottom: 1px solid var(--border-main);
+  background: rgba(240,246,255,0.60);
+  border-bottom: 1px solid rgba(46,60,181,0.15);
 }
 
 .tab-btn {
@@ -19,7 +19,7 @@
   padding: 14px;
   background: transparent;
   border: none;
-  color: var(--text-secondary);
+  color: #3a4a6b;
   font-family: inherit;
   font-weight: 700;
   font-size: 0.75rem;
@@ -31,14 +31,14 @@
 }
 
 .tab-btn:hover {
-  background: rgba(255,255,255,0.05);
-  color: white;
+  background: rgba(46,60,181,0.06);
+  color: #1e293b;
 }
 
 .tab-btn.active {
   color: var(--accent-primary);
   border-bottom-color: var(--accent-primary);
-  background: rgba(0, 242, 255, 0.05);
+  background: rgba(46,60,181,0.08);
 }
 
 .keyboard-keys {
@@ -50,10 +50,10 @@
 
 .key-btn {
   height: 48px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid var(--border-main);
+  background: rgba(255,255,255,0.80);
+  border: 1px solid rgba(46,60,181,0.20);
   border-radius: 8px;
-  color: white;
+  color: #1e293b;
   font-family: "JetBrains Mono", monospace;
   font-size: 1.1rem;
   cursor: pointer;
@@ -64,11 +64,11 @@
 }
 
 .key-btn:hover {
-  background: var(--grad-surface);
+  background: rgba(46,60,181,0.10);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 242, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(46,60,181,0.15);
 }
 
 .key-btn:active {

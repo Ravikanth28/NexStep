@@ -92,7 +92,7 @@ def infer_problem_type(problem_expr_str: str) -> str:
         return "transform"
     if re.search(r"(?<![A-Za-z])L\s*\^", problem_expr_str or ""):
         return "transform"
-    if any(keyword in lowered for keyword in ["probability", "bayes", "chi", "anova", "normal(", "poisson", "binomial", "p("]):
+    if any(keyword in lowered for keyword in ["probability", "bayes", "chi", "anova", "normal(", "poisson", "binomial", "p(", "coin", "toss", "heads", "tails", "card", "deck", "king", "queen", "ace"]):
         return "stats"
     if any(keyword in lowered for keyword in ["gradient", "divergence", "curl", "vector", "del"]):
         return "vector"
@@ -1803,6 +1803,8 @@ def validate_probability_stats_steps(steps: list[str], problem_expr_str: str) ->
     """Validation for probability, distributions, and hypothesis-testing workflows."""
     lowered_problem = (problem_expr_str or "").lower()
     bayes_problem = "bayes" in lowered_problem or "p(a|b)" in lowered_problem or "conditional probability" in lowered_problem
+    coin_problem = any(token in lowered_problem for token in ["coin", "toss", "heads", "tails"])
+    card_problem = any(token in lowered_problem for token in ["card", "deck", "king", "queen", "ace", "spade", "heart", "diamond", "club"])
     test_problem = any(token in lowered_problem for token in ["t-test", "t test", "chi-square", "chi square", "f-test", "f test", "anova", "regression", "correlation"])
     distribution_problem = any(token in lowered_problem for token in ["binomial", "poisson", "normal", "mgf", "mean", "variance", "random variable", "distribution"])
 
@@ -1827,6 +1829,48 @@ def validate_probability_stats_steps(steps: list[str], problem_expr_str: str) ->
                 message = "Good probability substitution step."
                 if "p(a|b)" in compact and any(ch.isdigit() for ch in compact):
                     saw_final = True
+        elif coin_problem:
+            if any(token in line for token in ["sample space", "{h,t}", "{heads,tails}", "heads, tails", "head, tail"]):
+                valid = True
+                message = "Good: identified the two equally likely outcomes."
+                saw_formula = True
+            elif any(token in line for token in ["favorable", "total outcomes", "number of outcomes", "1/2", "0.5", "50%"]):
+                valid = True
+                message = "Good probability setup or final value for a fair coin."
+                if any(token in line for token in ["1/2", "0.5", "50%"]):
+                    saw_final = True
+            elif "p(head" in compact or "p(h)" in compact:
+                valid = True
+                message = "Correct event notation for getting heads."
+                saw_formula = True
+                if any(token in compact for token in ["=1/2", "=0.5"]):
+                    saw_final = True
+        elif card_problem:
+            wrong_king_count = "king" in lowered_problem and (
+                "5/52" in compact
+                or "n(a)=5" in compact
+                or "favorableoutcomes=5" in compact
+                or "favourableoutcomes=5" in compact
+            )
+            if wrong_king_count:
+                valid = False
+                message = "A standard deck has 4 kings. Recheck the favorable-outcome count before computing the probability."
+            elif any(token in line for token in ["standard deck", "52 cards", "total outcomes", "n(s)=52", "n(s) = 52"]):
+                valid = True
+                message = "Good: identified the 52 equally likely cards in a standard deck."
+                saw_formula = True
+            elif "king" in lowered_problem and any(token in compact for token in ["4kings", "n(a)=4", "favorableoutcomes=4", "favourableoutcomes=4"]):
+                valid = True
+                message = "Correctly counts the favorable outcomes: 4 kings."
+                saw_formula = True
+            elif any(token in compact for token in ["p(a)=n(a)/n(s)", "p= favorable/total".replace(" ", "")]):
+                valid = True
+                message = "States the appropriate probability formula."
+                saw_formula = True
+            elif "king" in lowered_problem and any(token in compact for token in ["4/52", "1/13", "0.0769", "0.077"]):
+                valid = True
+                message = "Correct final probability for drawing a king."
+                saw_final = True
         elif test_problem:
             if any(token in line for token in ["h0", "h1", "null hypothesis", "alternative hypothesis"]):
                 valid = True
@@ -1867,7 +1911,7 @@ def validate_probability_stats_steps(steps: list[str], problem_expr_str: str) ->
                     "step": index + 1,
                     "expression": step_text,
                     "valid": False,
-                    "error": "This probability/statistics step is not in a supported pattern yet.",
+                    "error": message or "This probability/statistics step is not in a supported pattern yet.",
                 }
             )
         else:
@@ -1899,6 +1943,28 @@ def validate_probability_stats_steps(steps: list[str], problem_expr_str: str) ->
                 "expression": "Final probability result",
                 "valid": False,
                 "error": "Finish by computing and writing the final conditional probability.",
+            }
+        )
+
+    if coin_problem and not saw_final and results:
+        all_valid = False
+        results.append(
+            {
+                "step": len(results) + 1,
+                "expression": "Final probability result",
+                "valid": False,
+                "error": "Finish by substituting favorable outcomes over total outcomes and simplifying.",
+            }
+        )
+
+    if card_problem and "king" in lowered_problem and not saw_final and results:
+        all_valid = False
+        results.append(
+            {
+                "step": len(results) + 1,
+                "expression": "Final probability result",
+                "valid": False,
+                "error": "Finish by substituting the favorable and total card counts, then simplify.",
             }
         )
 
@@ -2489,6 +2555,9 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
                     return "pi^2/3 + sum(4*(-1)^n*cos(n*x)/n^2)"
             return "x = 2*sum(((-1)^(n+1)*sin(n*x))/n, (n,1,oo))"
 
+        if resolved == "stats":
+            return None
+
         # General fallback
         parsed = parse_expression_candidate(problem_expr_str)
         if parsed is not None:
@@ -2755,6 +2824,41 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
                      "detail": "f(x) = a₀/2 + Σ[aₙ·cos(nπx/L) + bₙ·sin(nπx/L)]"},
                 ]
 
+        elif resolved == "stats":
+            if any(token in lowered for token in ["coin", "toss", "heads", "tails"]) and "heads" in lowered:
+                steps = [
+                    {"step": 1, "title": "List the sample space",
+                     "detail": "For one fair coin toss, write all equally likely outcomes."},
+                    {"step": 2, "title": "Count favorable outcomes",
+                     "detail": "Count the outcomes that match the requested event."},
+                    {"step": 3, "title": "Count total outcomes",
+                     "detail": "Count all equally likely outcomes in the sample space."},
+                    {"step": 4, "title": "Compute probability",
+                     "detail": "Use probability = favorable outcomes / total outcomes."},
+                ]
+            elif any(token in lowered for token in ["card", "deck", "king"]) and "king" in lowered:
+                steps = [
+                    {"step": 1, "title": "Identify the sample space",
+                     "detail": "Use the total number of equally likely cards in a standard deck."},
+                    {"step": 2, "title": "Count favorable outcomes",
+                     "detail": "Count how many cards match the requested rank."},
+                    {"step": 3, "title": "Write the probability formula",
+                     "detail": "P(king) = favorable outcomes / total outcomes."},
+                    {"step": 4, "title": "Compute probability",
+                     "detail": "Substitute the counts and simplify the fraction."},
+                ]
+            else:
+                steps = [
+                    {"step": 1, "title": "Identify the probability model",
+                     "detail": "State the sample space, distribution, or event being measured."},
+                    {"step": 2, "title": "Write the probability formula",
+                     "detail": "Use favorable outcomes divided by total outcomes, or the relevant distribution formula."},
+                    {"step": 3, "title": "Substitute known values",
+                     "detail": "Replace each quantity with the values given in the problem."},
+                    {"step": 4, "title": "Compute the final probability",
+                     "detail": "Simplify to an exact fraction or decimal."},
+                ]
+
         # ── GENERAL FALLBACK ──────────────────────────────────────────────────
         else:
             parsed = parse_expression_candidate(problem_expr_str)
@@ -2871,6 +2975,17 @@ def get_hint(problem_expr_str: str, step_number: int = 0) -> str:
             "Start by writing the relevant probability or test-statistic formula.",
             "Substitute the known values clearly.",
             "End with the final probability or statistical conclusion.",
+        ]
+        if step_number < len(hints):
+            return hints[step_number]
+        return hints[-1]
+
+    if any(token in lowered_problem for token in ["coin", "toss", "heads", "tails"]):
+        hints = [
+            "List the possible outcomes for one fair coin toss: Heads and Tails.",
+            "Count the favorable outcomes for getting heads.",
+            "Use probability = favorable outcomes / total equally likely outcomes.",
+            "Substitute the counts into the fraction and simplify.",
         ]
         if step_number < len(hints):
             return hints[step_number]

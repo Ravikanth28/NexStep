@@ -16,7 +16,7 @@ function DragHandle({ onMouseDown }) {
       title="Drag to reorder"
       style={{
         cursor: 'grab',
-        color: 'rgba(255,255,255,0.18)',
+        color: 'rgba(46,60,181,0.25)',
         fontSize: '1rem',
         padding: '0 4px',
         userSelect: 'none',
@@ -111,7 +111,7 @@ function StepRow({
         alignItems: 'center',
         gap: '8px',
         padding: '6px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        borderBottom: '1px solid rgba(46,60,181,0.10)',
         opacity: isDragOver === 'dragging' ? 0.35 : 1,
         transition: 'opacity 0.15s',
       }}
@@ -143,15 +143,15 @@ function StepRow({
         ref={mfRef}
         style={{
           flex: 1,
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'white',
+          border: '1px solid rgba(46,60,181,0.25)',
           borderRadius: '8px',
           padding: '10px 14px',
           fontSize: '1.15rem',
-          color: 'white',
+          color: '#0a1628',
           minHeight: '48px',
-          '--caret-color': '#00e5be',
-          '--selection-background-color': 'rgba(0,229,190,0.25)',
+          '--caret-color': '#7c3aed',
+          '--selection-background-color': 'rgba(124,58,237,0.15)',
           '--text-font-family': 'JetBrains Mono',
           outline: 'none',
         }}
@@ -211,7 +211,7 @@ function StepRow({
           style={{
             background: 'none',
             border: 'none',
-            color: 'rgba(255,255,255,0.2)',
+            color: 'rgba(46,60,181,0.35)',
             cursor: 'pointer',
             fontSize: '1.1rem',
             padding: '0 4px',
@@ -241,11 +241,11 @@ function StepHintBox({ hint }) {
         marginLeft: '56px',
         marginBottom: '6px',
         padding: '8px 12px',
-        background: 'rgba(255,200,0,0.06)',
-        border: '1px solid rgba(255,200,0,0.2)',
+        background: 'rgba(245,200,0,0.08)',
+        border: '1px solid rgba(200,160,0,0.30)',
         borderRadius: '6px',
         fontSize: '0.78rem',
-        color: '#f0c040',
+        color: '#8a6000',
         lineHeight: 1.5,
       }}
     >
@@ -434,19 +434,20 @@ export default function MathStepEditor({ steps, onChange, results, onInsertFromK
         onClick={handleAddStep}
         style={{
           marginTop: '12px',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px dashed rgba(255,255,255,0.15)',
+          background: 'rgba(255,255,255,0.90)',
+          border: '2px dashed rgba(46,60,181,0.30)',
           borderRadius: '8px',
           padding: '10px',
-          color: 'rgba(255,255,255,0.4)',
+          color: '#3a4a6b',
           cursor: 'pointer',
-          fontSize: '0.75rem',
+          fontSize: '0.85rem',
           fontFamily: 'JetBrains Mono',
+          fontWeight: 700,
           textAlign: 'center',
           transition: 'all 0.15s',
         }}
         onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
-        onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(46,60,181,0.30)'}
       >
         + Add step  (or press Enter inside any step)
       </button>

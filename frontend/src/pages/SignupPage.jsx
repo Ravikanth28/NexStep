@@ -32,22 +32,22 @@ export default function SignupPage({ onLogin }) {
     <div className="auth-page">
       <div className="auth-shell">
         <div>
-          <div className="hero-kicker">Network Initialization</div>
-          <h1 className="hero-title">Forge your <span className="text-gradient">Neural Identity.</span></h1>
+          <div className="hero-kicker">Create your account</div>
+          <h1 className="hero-title">Join <span className="text-gradient">NexStep.</span></h1>
           <p className="hero-subtitle">
-            Join the NextStep ecosystem to leverage state-of-the-art symbolic validation and AI-guided mathematical research.
+            Practice advanced mathematics with AI-guided feedback and step-by-step validation.
           </p>
           
           <div style={{ marginTop: '40px', display: 'grid', gap: '16px' }}>
             <div className="stat-card" style={{ padding: '24px' }}>
-              <div style={{ fontWeight: 700, marginBottom: '8px' }}>Personal Cloud</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Permanent storage for all derivations and solutions</div>
-              <div className="badge badge-easy" style={{ marginTop: '12px' }}>UNLIMITED</div>
+              <div style={{ fontWeight: 700, marginBottom: '8px' }}>Your Workspace</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>All your solutions and progress saved in one place</div>
+              <div className="badge badge-easy" style={{ marginTop: '12px' }}>FREE</div>
             </div>
             <div className="stat-card" style={{ padding: '24px' }}>
-              <div style={{ fontWeight: 700, marginBottom: '8px' }}>Advanced Analytics</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Deep insights into error patterns and symbolic logic</div>
-              <div className="badge badge-easy" style={{ marginTop: '12px' }}>PREMIUM ENABLED</div>
+              <div style={{ fontWeight: 700, marginBottom: '8px' }}>Performance Analytics</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>See where you're strong and where to improve</div>
+              <div className="badge badge-easy" style={{ marginTop: '12px' }}>INCLUDED</div>
             </div>
           </div>
         </div>
@@ -55,8 +55,8 @@ export default function SignupPage({ onLogin }) {
         <form className="auth-card" onSubmit={handleSubmit}>
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <div className="brand-mark" style={{ margin: '0 auto 24px' }}>Nx</div>
-            <h2>Register Node</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '8px' }}>Select your identity type to begin</p>
+            <h2>Create Account</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '8px' }}>Choose your account type to get started</p>
           </div>
 
           {error && (
@@ -74,16 +74,16 @@ export default function SignupPage({ onLogin }) {
                 style={{ flex: 1, padding: '12px', fontSize: '0.85rem', borderRadius: '12px' }}
                 onClick={() => setRole(r)}
               >
-                {r.charAt(0).toUpperCase() + r.slice(1)} Identity
+                {r.charAt(0).toUpperCase() + r.slice(1)}
               </button>
             ))}
           </div>
 
           <div className="form-group">
-            <label>Public Alias (Username)</label>
+            <label>Username</label>
             <input
               type="text"
-              placeholder="e.g. Euler_2024"
+              placeholder="e.g. john_doe"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -91,7 +91,7 @@ export default function SignupPage({ onLogin }) {
           </div>
 
           <div className="form-group" style={{ marginTop: '20px' }}>
-            <label>Neural Identity (Email)</label>
+            <label>Email</label>
             <input
               type="email"
               placeholder="name@domain.com"
@@ -102,7 +102,7 @@ export default function SignupPage({ onLogin }) {
           </div>
 
           <div className="form-group" style={{ marginTop: '20px' }}>
-            <label>Security Key (Password)</label>
+            <label>Password</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -113,11 +113,11 @@ export default function SignupPage({ onLogin }) {
           </div>
 
           <button className="btn btn-primary" style={{ width: '100%', marginTop: '32px', justifyContent: 'center' }} disabled={loading} type="submit">
-            {loading ? <div className="spinner"></div> : 'Initialize Node'}
+            {loading ? <div className="spinner"></div> : 'Create Account'}
           </button>
 
           <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Existing node? <Link to="/login" style={{ color: 'var(--accent-primary)', fontWeight: 700, textDecoration: 'none' }}>Authenticate</Link>
+            Already have an account? <Link to="/login" style={{ color: 'var(--accent-primary)', fontWeight: 700, textDecoration: 'none' }}>Sign In</Link>
           </p>
         </form>
       </div>

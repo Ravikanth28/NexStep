@@ -10,10 +10,12 @@ import TeacherDashboard from './pages/TeacherDashboard';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const isHome = location.pathname === '/';
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   return (
-    <nav className="navbar">
+    <nav className={`navbar ${isHome ? 'navbar-home' : ''}`}>
       <Link to="/" className="navbar-brand">
         <div className="brand-mark">Nx</div>
         <div className="brand-info">
@@ -21,16 +23,21 @@ function Navbar({ user, onLogout }) {
         </div>
       </Link>
 
-      <div className="navbar-links" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="heartbeat"></div>
-          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>ENGINE: NOMINAL</span>
+      {isHome && !user && (
+        <div className="navbar-pill-nav">
+          <button className="nav-pill-link nav-pill-link-active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Home</button>
+          <button className="nav-pill-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
+          <button className="nav-pill-link" onClick={() => navigate('/signup')}>Simulator</button>
+          <button className="nav-pill-link" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>About</button>
         </div>
+      )}
+
+      <div className="navbar-links" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
         {user ? (
           <>
             <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>Workspace</Link>
             {user.role === 'student' && (
-              <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>Telemetry</Link>
+              <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>Analytics</Link>
             )}
             {user.role === 'teacher' && (
               <Link to="/teacher" className={`nav-link ${isActive('/teacher') ? 'active' : ''}`}>Control</Link>
@@ -63,86 +70,87 @@ function HomePage({ user }) {
   const navigate = useNavigate();
 
   return (
-    <div className="page">
-      <div className="container">
-        <section className="workspace-hero">
-          <div>
-            <div className="hero-kicker">Neural Symbolic Engine v4.0</div>
-            <h1 className="hero-title">
-              Mathematical <span className="text-gradient">Precision.</span><br />
-              Intelligence Driven.
-            </h1>
-            <p className="hero-subtitle">
-              A high-performance workspace for deep mathematical exploration, combining symbolic reasoning with neural accuracy.
-            </p>
+    <div className="page home-page">
 
-            <div style={{ display: 'flex', gap: '16px', marginTop: '40px' }}>
-              {user ? (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => navigate(user.role === 'teacher' ? '/teacher' : '/questions')}
-                >
-                  Enter Command Studio &rarr;
-                </button>
-              ) : (
-                <>
-                  <button className="btn btn-primary" onClick={() => navigate('/signup')}>Initialize Studio</button>
-                  <button className="btn btn-outline" onClick={() => navigate('/login')}>Authenticate</button>
-                </>
-              )}
-            </div>
-          </div>
-          
-          <div className="card" style={{ background: 'rgba(0,0,0,0.4)', borderColor: 'var(--accent-primary)', position: 'relative' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-              <div className="badge badge-easy">Live Processing</div>
-              <div style={{ color: 'var(--accent-primary)', fontFamily: 'JetBrains Mono' }}>SYS-OK</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ width: '4px', background: 'var(--accent-primary)', borderRadius: '2px' }}></div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Neural Parsing</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Vector calculus, tensor fields, ODEs</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ width: '4px', background: 'var(--accent-secondary)', borderRadius: '2px' }}></div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Symbolic Routing</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Automated strategy selection & verification</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '16px', opacity: 0.5 }}>
-                <div style={{ width: '4px', background: 'var(--text-muted)', borderRadius: '2px' }}></div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Resolution Engine</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Rigorous step-by-step symbolic checks</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+      {/* ── Hero ── */}
+      <div className="home-hero-wrap">
 
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-value text-gradient">99.8%</div>
-            <div className="stat-label">Model Accuracy</div>
+        {/* Floating annotations */}
+        <div className="home-ann home-ann-bl">
+          <p>If you don't know where<br />to start, try the guided<br />tour first.</p>
+        </div>
+        <div className="home-ann home-ann-tr">
+          <p>Solve your mathematics<br />problems powered<br />by our AI engine.</p>
+        </div>
+
+        {/* Big headline */}
+        <div className="home-headline-block">
+          <p className="home-hl">
+            It's&nbsp;<span className="home-blob">⚡</span>&nbsp;time
+          </p>
+          <p className="home-hl">
+            to&nbsp;<span className="home-blob home-blob-wide">→&nbsp;upgrade</span>&nbsp;your
+          </p>
+          <p className="home-hl home-hl-accent">
+            mathematics!
+          </p>
+        </div>
+
+        {/* Pill CTAs */}
+        <div className="home-pill-ctas">
+          <div className="home-pill home-pill-ghost">
+            <span className="home-pill-nav">‹‹</span>
+            <button
+              className="home-pill-btn"
+              onClick={() => navigate(user ? (user.role === 'teacher' ? '/teacher' : '/questions') : '/signup')}
+            >
+              {user ? 'Open Workspace' : 'Get Started Free'}
+            </button>
+            <span className="home-pill-icon">🗺</span>
           </div>
-          <div className="stat-card">
-            <div className="stat-value">12.4k</div>
-            <div className="stat-label">Derivations Proved</div>
+          <div className="home-pill home-pill-solid">
+            <span className="home-pill-icon">⌘</span>
+            <button
+              className="home-pill-btn"
+              onClick={() => navigate(user ? '/questions' : '/login')}
+            >
+              {user ? 'Enter Studio' : 'Sign In'}
+            </button>
+            <span className="home-pill-nav">&gt;&gt;</span>
           </div>
-          <div className="stat-card">
-            <div className="stat-value">4.0</div>
-            <div className="stat-label">Engine Version</div>
+        </div>
+
+      </div>
+
+      {/* ── Feature Cards ── */}
+      <div className="home-features-wrap" id="features">
+        <div className="home-features">
+          <div className="feature-card">
+            <div className="feature-icon">⚡</div>
+            <h3>Neural Parsing</h3>
+            <p>Vector calculus, tensor fields, ODEs and complex symbolic expressions.</p>
           </div>
-          <div className="stat-card">
-            <div className="stat-value text-gradient">Instant</div>
-            <div className="stat-label">Response Time</div>
+          <div className="feature-card">
+            <div className="feature-icon">🔀</div>
+            <h3>Symbolic Routing</h3>
+            <p>Automatic strategy selection and step-by-step verification.</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">✓</div>
+            <h3>Resolution Engine</h3>
+            <p>Every derivation verified — mathematically sound and complete.</p>
           </div>
         </div>
       </div>
+
+      {/* ── About ── */}
+      <div id="about" style={{ padding: '48px 80px 72px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.40)' }}>
+        <p style={{ fontSize: '1.7rem', fontWeight: 800, color: '#0a1628', marginBottom: '14px' }}>Built for serious mathematics.</p>
+        <p style={{ color: '#1e3a5a', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: 1.85 }}>
+          NexStep combines AI-powered symbolic reasoning with step-by-step pedagogy to help students master advanced mathematics.
+        </p>
+      </div>
+
     </div>
   );
 }

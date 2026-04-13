@@ -364,14 +364,14 @@ export default function SolvePage() {
 
         <section className="workspace-hero" style={{ padding: '50px', gridTemplateColumns: 'minmax(0, 1fr) 450px', minHeight: '300px' }}>
           <div>
-            <div className="hero-kicker">Neural Symbolic Solver v4.0</div>
+            <div className="hero-kicker">AI Solver</div>
             <h1 className="hero-title" style={{ fontSize: '3rem' }}>{question.title}</h1>
             <div className="chip-wrap" style={{ margin: '20px 0' }}>
               <div className="badge badge-easy">{question.subject || 'Engineering Math'}</div>
               <div className="badge badge-medium">{question.topic}</div>
               <div className="badge badge-hard">{question.difficulty}</div>
             </div>
-            <div className="problem" style={{ fontSize: '1.5rem', padding: '24px', background: 'rgba(0,0,0,0.5)', borderColor: 'var(--accent-primary)' }}>
+            <div className="problem" style={{ fontSize: '1.5rem', padding: '24px', background: 'rgba(240,246,255,0.90)', borderColor: 'rgba(46,60,181,0.25)' }}>
               <math-field
                 read-only
                 style={{ fontSize: '1.4rem', background: 'transparent', color: 'inherit', border: 'none', width: '100%' }}
@@ -386,8 +386,8 @@ export default function SolvePage() {
             </div>
           </div>
 
-          <div className="card" style={{ padding: '32px', background: 'rgba(0,0,0,0.3)', position: 'relative', overflow: 'hidden' }}>
-            <div className="hero-kicker" style={{ fontSize: '0.65rem', marginBottom: '20px' }}>AI Routing Metadata</div>
+          <div className="card" style={{ padding: '32px', background: 'rgba(255,255,255,0.88)', position: 'relative', overflow: 'hidden', border: '1px solid rgba(46,60,181,0.15)' }}>
+            <div className="hero-kicker" style={{ fontSize: '0.65rem', marginBottom: '20px' }}>Question Info</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>STRATEGY</div>
@@ -486,18 +486,18 @@ export default function SolvePage() {
                   )}
                   {hintFormulas.length > 0 && (
                     <div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#f0c040', letterSpacing: '0.08em', marginBottom: '10px' }}>📋 RELEVANT FORMULAS</div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '0.08em', marginBottom: '10px' }}>📋 RELEVANT FORMULAS</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {hintFormulas.map((f, i) => (
-                          <div key={i} style={{ background: 'rgba(255,200,0,0.05)', border: '1px solid rgba(255,200,0,0.18)', borderRadius: '8px', padding: '12px 16px' }}>
-                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#f0c040', letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase' }}>{f.name}</div>
+                          <div key={i} style={{ background: 'rgba(240,246,255,0.90)', border: '1px solid rgba(46,60,181,0.18)', borderRadius: '8px', padding: '12px 16px' }}>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase' }}>{f.name}</div>
                             <math-field
                               read-only=""
                               style={{
                                 display: 'block',
                                 background: 'transparent',
                                 border: 'none',
-                                color: 'white',
+                                color: '#0a1628',
                                 fontSize: '1.05rem',
                                 outline: 'none',
                                 '--text-font-family': 'JetBrains Mono',
@@ -568,13 +568,13 @@ export default function SolvePage() {
                   {/* ── Audio Explanation Panel ── */}
                   {speechReady && (
                     <div className="telemetry-card" style={{
-                      borderColor: speaking ? 'var(--accent-primary)' : speechPaused ? '#f0c040' : 'var(--border-main)',
-                      background: speaking ? 'rgba(0,242,255,0.04)' : 'rgba(255,255,255,0.02)',
+                      borderColor: speaking ? 'var(--accent-primary)' : speechPaused ? 'var(--accent-primary)' : 'var(--border-main)',
+                      background: speaking ? 'rgba(124,58,237,0.06)' : 'rgba(255,255,255,0.92)',
                       transition: 'border-color 0.3s',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <div>
-                          <div className="telemetry-card-label" style={{ color: speaking ? 'var(--accent-primary)' : speechPaused ? '#f0c040' : 'var(--text-muted)' }}>
+                          <div className="telemetry-card-label" style={{ color: speaking ? 'var(--accent-primary)' : speechPaused ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
                             Audio Explanation
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -606,14 +606,13 @@ export default function SolvePage() {
                             disabled={speaking}
                             style={{
                               width: '100%',
-                              background: '#111827',
-                              border: '1px solid rgba(255,255,255,0.12)',
+                              background: 'white',
+                              border: '1px solid rgba(46,60,181,0.20)',
                               borderRadius: '6px',
-                              color: 'white',
+                              color: '#1e293b',
                               fontSize: '0.78rem',
                               padding: '5px 8px',
                               cursor: 'pointer',
-                              colorScheme: 'dark',
                             }}
                           >
                             <option value="en-IN">English (India)</option>
@@ -632,14 +631,13 @@ export default function SolvePage() {
                             disabled={speaking}
                             style={{
                               width: '100%',
-                              background: '#111827',
-                              border: '1px solid rgba(255,255,255,0.12)',
+                              background: 'white',
+                              border: '1px solid rgba(46,60,181,0.20)',
                               borderRadius: '6px',
-                              color: 'white',
+                              color: '#1e293b',
                               fontSize: '0.78rem',
                               padding: '5px 8px',
                               cursor: 'pointer',
-                              colorScheme: 'dark',
                             }}
                           >
                             <option value="ritu">Ritu (Female)</option>

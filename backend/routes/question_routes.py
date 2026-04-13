@@ -94,6 +94,131 @@ class ParseImageRequest(BaseModel):
     image_b64: str
 
 
+class NaturalQuestionFormatRequest(BaseModel):
+    question: str
+
+
+def _fallback_format_natural_question(question: str) -> dict:
+    text = (question or "").strip()
+    lowered = text.lower()
+
+    if any(token in lowered for token in ["coin", "toss", "heads", "tails"]):
+        event = "heads" if "head" in lowered else "tails" if "tail" in lowered else "heads"
+        title_event = "Heads" if event == "heads" else "Tails"
+        return {
+            "title": f"Probability of Getting {title_event}",
+            "problem_expr": text,
+            "difficulty": "easy",
+            "topic": "Probability",
+            "subject": "Probability and Statistics",
+            "unit_name": "Probability",
+            "problem_type": "stats",
+            "concept_tags": ["probability", "sample space", "equally likely outcomes", "coin toss"],
+            "hints": [
+                "List the possible outcomes for one coin toss.",
+                f"Count how many outcomes give {title_event.lower()}.",
+                "Use probability = favorable outcomes / total outcomes.",
+            ],
+            "allow_copy_paste": True,
+        }
+
+    if any(token in lowered for token in ["card", "deck", "king", "queen", "ace"]):
+        title = "Probability of Drawing a King" if "king" in lowered else "Card Probability"
+        return {
+            "title": title,
+            "problem_expr": text,
+            "difficulty": "easy",
+            "topic": "Probability",
+            "subject": "Probability and Statistics",
+            "unit_name": "Probability",
+            "problem_type": "stats",
+            "concept_tags": ["probability", "sample space", "equally likely outcomes", "standard deck"],
+            "hints": [
+                "A standard deck has 52 cards.",
+                "Count the favorable cards requested by the problem.",
+                "Use probability = favorable outcomes / total outcomes.",
+            ],
+            "allow_copy_paste": True,
+        }
+
+    analysis = analyze_question_text(text, text, None)
+    return {
+        "title": text[:80] or "Untitled Question",
+        "problem_expr": text,
+        "difficulty": analysis.difficulty,
+        "topic": analysis.topic,
+        "subject": analysis.subject,
+        "unit_name": analysis.unit_name,
+        "problem_type": analysis.strategy,
+        "concept_tags": analysis.concept_tags,
+        "hints": [],
+        "allow_copy_paste": True,
+    }
+
+
+def _extract_json_object(raw_text: str) -> dict | None:
+    clean = (raw_text or "").strip()
+    if not clean:
+        return None
+    if "```" in clean:
+        parts = clean.split("```")
+        clean = parts[1] if len(parts) > 1 else clean
+        if clean.lstrip().startswith("json"):
+            clean = clean.lstrip()[4:]
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start >= 0 and end > start:
+        clean = clean[start:end + 1]
+    try:
+        parsed = json.loads(clean)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+@router.post("/format-natural")
+async def format_natural_question(
+    req: NaturalQuestionFormatRequest,
+    current_user: User = Depends(_resolve_user),
+):
+    """Convert a teacher's natural-language question into form fields.
+
+    This does not grade or solve the problem for students; it only fills metadata
+    and parser-friendly fields. Local deterministic formatting remains available
+    if AI providers are down.
+    """
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can format questions")
+
+    fallback = _fallback_format_natural_question(req.question)
+
+    from ai_engine import get_ai_response
+
+    system_prompt = (
+        "You format teacher-authored math questions into app form fields. "
+        "Do not provide a full solution and do not evaluate student work. "
+        "Return ONLY JSON with keys: title, problem_expr, difficulty, topic, subject, "
+        "unit_name, problem_type, concept_tags, hints, allow_copy_paste. "
+        "problem_type must be one of: integral, series, transform, matrix, stats, vector, "
+        "multivariable, ode, algebra, other. "
+        "For simple probability questions, preserve the natural-language problem_expr and set problem_type to stats."
+    )
+    prompt = f"Format this question for the NexStep form:\n{req.question}"
+    response_text = await get_ai_response(prompt, system_prompt)
+    ai_fields = _extract_json_object(response_text)
+
+    if not ai_fields:
+        return {"fields": fallback, "source": "local"}
+
+    fields = {**fallback, **{key: value for key, value in ai_fields.items() if value not in (None, "", [])}}
+    if not isinstance(fields.get("concept_tags"), list):
+        fields["concept_tags"] = fallback["concept_tags"]
+    if not isinstance(fields.get("hints"), list):
+        fields["hints"] = fallback["hints"]
+    fields["problem_expr"] = fields.get("problem_expr") or req.question
+    return {"fields": fields, "source": "ai"}
+
+
 @router.post("/parse-image")
 async def parse_expression_image(
     req: ParseImageRequest,
@@ -106,22 +231,30 @@ async def parse_expression_image(
     from ai_engine import get_ai_response
 
     system_prompt = (
-        "You are a math OCR engine. The user provides a base64-encoded image of a mathematical "
-        "expression or equation. Extract the expression and return ONLY a JSON object:\n"
-        '{"expression": "<sympy_expression>", "confidence": 0.95}\n'
-        "Convert to SymPy-compatible syntax (e.g. x**2, integrate(x**2, (x, 0, 1)), sin(x), etc.)."
+        "You are a math OCR engine. The user provides a base64-encoded image of a math problem. "
+        "Extract all relevant information and return ONLY a JSON object with these fields:\n"
+        '{"expression": "<sympy_expression>", "title": "<short question title>", '
+        '"topic": "<math topic e.g. Calculus, Algebra, Differential Equations>", '
+        '"difficulty": "<easy|medium|hard>", '
+        '"problem_type": "<integral|series|ode|matrix|transform|algebra|geometry|other>", '
+        '"confidence": 0.95}\n'
+        "Convert the expression to SymPy-compatible syntax (e.g. x**2, integrate(x**2, (x, 0, 1)), sin(x), etc.). "
+        "Return only the JSON object, no markdown fences."
     )
-    short_b64 = req.image_b64[:200] if len(req.image_b64) > 200 else req.image_b64
-    prompt = f"Extract the math expression from this image (base64 prefix): {short_b64}..."
+    prompt = f"Extract the math problem from this image. Image base64: data:image/png;base64,{req.image_b64}"
     response_text = await get_ai_response(prompt, system_prompt)
 
     if not response_text:
         return {"expression": "", "error": "AI providers are currently unavailable. Please enter the expression manually."}
 
     try:
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0].strip()
-        data = json.loads(response_text)
+        clean = response_text.strip()
+        if "```" in clean:
+            clean = clean.split("```")[1]
+            if clean.startswith("json"):
+                clean = clean[4:]
+            clean = clean.strip()
+        data = json.loads(clean)
         return data
     except Exception as e:
         return {"expression": "", "error": f"Failed to parse image: {str(e)}"}
@@ -142,7 +275,7 @@ def get_question_answer(
         raise HTTPException(status_code=404, detail="Question not found")
 
     from validation_engine import compute_correct_answer
-    strategy = q.validation_strategy or q.problem_type
+    strategy = q.problem_type or q.validation_strategy
     answer = compute_correct_answer(q.problem_expr, strategy)
     return {"question_id": question_id, "correct_answer": answer, "strategy": strategy}
 
@@ -176,7 +309,7 @@ def create_question(
         unit_name=req.unit_name or analysis.unit_name,
         concept_tags=serialize_concept_tags(concept_tags),
         problem_type=req.problem_type or analysis.strategy,
-        validation_strategy=req.problem_type or analysis.strategy,
+        validation_strategy="ai_against_sympy_reference",
         analysis_confidence=analysis.confidence,
         hints=json.dumps(req.hints),
         allow_copy_paste=req.allow_copy_paste,

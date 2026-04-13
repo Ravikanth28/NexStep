@@ -87,28 +87,28 @@ export default function QuestionsPage() {
       <div className="container">
         <section className="workspace-hero" style={{ padding: '60px', gridTemplateColumns: '1fr 380px' }}>
           <div>
-            <div className="hero-kicker">Practice Observatory</div>
-            <h1 className="hero-title"><span className="text-gradient">Data-Driven</span><br />Mathematics.</h1>
-            <p className="hero-subtitle">Interactive symbolic environments with real-time neural validation and automated strategy execution.</p>
+            <div className="hero-kicker">Practice</div>
+            <h1 className="hero-title"><span className="text-gradient">Mathematics</span><br />Questions.</h1>
+            <p className="hero-subtitle">Browse and solve questions across all topics. AI checks your steps in real time.</p>
           </div>
           
-          <div className="card" style={{ background: 'rgba(0,0,0,0.4)', borderColor: 'var(--accent-primary)', padding: '32px' }}>
+          <div className="card" style={{ background: 'rgba(255,255,255,0.88)', borderColor: 'rgba(46,60,181,0.15)', padding: '32px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>ACTIVE NODES</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Questions</div>
                 <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{visibleQuestions.length}</div>
               </div>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>ROUTING CONF</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Avg. Confidence</div>
                 <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent-success)' }}>{routedAverage}%</div>
               </div>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>ENGINE MODE</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700 }}>AI SYMPY</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Engine</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700 }}>AI SymPy</div>
               </div>
               <div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>DOMAIN FOCUS</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-primary)' }}>{topic}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Topic</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#2e3cb5' }}>{topic}</div>
               </div>
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function QuestionsPage() {
         <div className="question-browser" style={{ gridTemplateColumns: '280px 1fr' }}>
           <aside>
             <div className="card" style={{ padding: '32px', position: 'sticky', top: '120px' }}>
-              <div className="hero-kicker" style={{ fontSize: '0.65rem', marginBottom: '16px' }}>Filter Constellation</div>
+              <div className="hero-kicker" style={{ fontSize: '0.65rem', marginBottom: '16px' }}>Filter by Topic</div>
               <h3 style={{ marginBottom: '24px' }}>Syllabus Domain</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {SYLLABUS_TOPICS.map((item) => (
@@ -128,7 +128,7 @@ export default function QuestionsPage() {
                       textAlign: 'left', 
                       padding: '12px 16px', 
                       borderRadius: '8px',
-                      background: topic === item ? 'rgba(0, 242, 255, 0.1)' : 'transparent',
+                      background: topic === item ? 'rgba(46,60,181,0.08)' : 'transparent',
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: '0.9rem',
@@ -150,7 +150,7 @@ export default function QuestionsPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by title, expression, or topic..."
-                  style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '16px 24px' }}
+                  style={{ background: 'rgba(255,255,255,0.90)', borderRadius: '12px', padding: '16px 24px' }}
                 />
                 <div className="tab-strip" style={{ margin: 0 }}>
                   {['', 'easy', 'medium', 'hard'].map((value) => (
@@ -233,12 +233,12 @@ export default function QuestionsPage() {
                             <div style={{
                               marginTop: '10px',
                               padding: '14px 16px',
-                              background: 'rgba(0, 242, 255, 0.05)',
-                              border: '1px solid var(--accent-primary)',
+                              background: 'rgba(46,60,181,0.06)',
+                              border: '1px solid rgba(46,60,181,0.20)',
                               borderRadius: '8px',
                             }}>
-                              <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '6px' }}>CORRECT ANSWER</div>
-                              <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', color: 'var(--accent-primary)', wordBreak: 'break-all' }}>
+                              <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#2e3cb5', marginBottom: '6px' }}>CORRECT ANSWER</div>
+                              <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', color: '#2e3cb5', wordBreak: 'break-all' }}>
                                 {revealedAnswers[question.id]}
                               </div>
                             </div>

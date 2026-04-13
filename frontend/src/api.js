@@ -49,6 +49,7 @@ export const createQuestion = (body) => request('/questions', { method: 'POST', 
 export const deleteQuestion = (id) => request(`/questions/${id}`, { method: 'DELETE' });
 export const getQuestionAnswer = (id) => request(`/questions/${id}/answer`);
 export const analyzeQuestion = (body) => request('/questions/analyze', { method: 'POST', body: JSON.stringify(body) });
+export const formatNaturalQuestion = (question) => request('/questions/format-natural', { method: 'POST', body: JSON.stringify({ question }) });
 export const parseExpressionImage = (image_b64) => request('/questions/parse-image', { method: 'POST', body: JSON.stringify({ image_b64 }) });
 export const getSyllabusMeta = () => request('/questions/meta/syllabus');
 
