@@ -45,6 +45,7 @@ export const getQuestions = (difficulty, topic) => {
   return request(`/questions${qStr ? `?${qStr}` : ''}`);
 };
 export const getQuestion = (id) => request(`/questions/${id}`);
+export const getQuestionSolution = (id) => request(`/questions/${id}/solution`);
 export const createQuestion = (body) => request('/questions', { method: 'POST', body: JSON.stringify(body) });
 export const deleteQuestion = (id) => request(`/questions/${id}`, { method: 'DELETE' });
 export const getQuestionAnswer = (id) => request(`/questions/${id}/answer`);

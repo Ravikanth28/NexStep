@@ -179,7 +179,7 @@ export default function QuestionsPage() {
             ) : (
               <div className="questions-grid">
                 {visibleQuestions.map((question, index) => (
-                  <button
+                  <div
                     key={question.id}
                     className="question-card"
                     style={{ 
@@ -219,6 +219,28 @@ export default function QuestionsPage() {
                         <div className="soft-pill" style={{ color: 'var(--accent-primary)' }}>{Math.round((question.analysis_confidence || 0) * 100)}% Routed</div>
                       </div>
 
+                      {user?.role === 'student' && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '22px' }}
+                        >
+                          <button
+                            className="btn btn-primary"
+                            style={{ justifyContent: 'center', padding: '10px 14px', fontSize: '0.8rem' }}
+                            onClick={() => navigate(`/solve/${question.id}`)}
+                          >
+                            Solve
+                          </button>
+                          <button
+                            className="btn btn-outline"
+                            style={{ justifyContent: 'center', padding: '10px 14px', fontSize: '0.8rem' }}
+                            onClick={() => navigate(`/solution/${question.id}`)}
+                          >
+                            See Solution
+                          </button>
+                        </div>
+                      )}
+
                       {user?.role === 'teacher' && (
                         <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '20px' }}>
                           <button
@@ -246,7 +268,7 @@ export default function QuestionsPage() {
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}

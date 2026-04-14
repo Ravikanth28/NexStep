@@ -22,6 +22,8 @@ function formatTime(seconds) {
 export default function SolvePage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  const isStudent = user?.role === 'student';
   const [question, setQuestion] = useState(null);
   const [steps, setSteps] = useState(['']);
   const [results, setResults] = useState(null);
@@ -230,7 +232,7 @@ export default function SolvePage() {
         latex_steps: steps.filter((s) => s.trim()),
       });
       setStepHints((prev) => ({ ...prev, [stepIndex]: data.hint }));
-    } catch (err) {
+    } catch {
       setStepHints((prev) => ({ ...prev, [stepIndex]: 'Could not get hint right now.' }));
     } finally {
       setLoadingHintIndex(null);
@@ -364,7 +366,7 @@ export default function SolvePage() {
 
         <section className="workspace-hero" style={{ padding: '50px', gridTemplateColumns: 'minmax(0, 1fr) 450px', minHeight: '300px' }}>
           <div>
-            <div className="hero-kicker">AI Solver</div>
+            <div className="hero-kicker">Solver</div>
             <h1 className="hero-title" style={{ fontSize: '3rem' }}>{question.title}</h1>
             <div className="chip-wrap" style={{ margin: '20px 0' }}>
               <div className="badge badge-easy">{question.subject || 'Engineering Math'}</div>
@@ -388,6 +390,20 @@ export default function SolvePage() {
 
           <div className="card" style={{ padding: '32px', background: 'rgba(255,255,255,0.88)', position: 'relative', overflow: 'hidden', border: '1px solid rgba(46,60,181,0.15)' }}>
             <div className="hero-kicker" style={{ fontSize: '0.65rem', marginBottom: '20px' }}>Question Info</div>
+            {isStudent ? (
+              <div style={{ display: 'grid', gap: '18px' }}>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>GOAL</div>
+                  <div style={{ fontWeight: 700, marginTop: '4px' }}>Write your solution steps, then commit once.</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>RESULT</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: '1.5' }}>
+                    After validation, you will see only whether your answer is correct.
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 }}>STRATEGY</div>
@@ -404,6 +420,7 @@ export default function SolvePage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </section>
 
@@ -436,7 +453,7 @@ export default function SolvePage() {
                 <MathStepEditor
                   steps={steps}
                   onChange={handleStepsChange}
-                  results={results}
+                  results={isStudent ? null : results}
                   onInsertFromKeyboard={insertFromKeyboardRef}
                   activeStepIndex={activeStepIndex}
                   onActiveStepChange={setActiveStepIndex}
@@ -514,6 +531,46 @@ export default function SolvePage() {
           </main>
         </div>
 
+        {isStudent ? (
+          <section className="solver-panel" style={{ minHeight: 'auto' }}>
+            <div className="solver-panel-head">
+              <div>
+                <div className="solver-kicker">Validation Result</div>
+                <h3 className="solver-title">Answer Check</h3>
+              </div>
+              <div className={`solver-head-badge ${verdict === 'Correct' ? 'badge-solved' : verdict ? 'badge-unsolved' : ''}`}>
+                {verdict ? 'checked' : 'waiting'}
+              </div>
+            </div>
+            <div className="solver-panel-body" style={{ padding: '34px', minHeight: '180px', justifyContent: 'center' }}>
+              {!verdict && !validationError ? (
+                <div className="telemetry-empty" style={{ minHeight: '140px' }}>
+                  <div className="telemetry-empty-icon">?</div>
+                  <p>Commit and validate when your answer is ready.</p>
+                </div>
+              ) : validationError ? (
+                <div className="telemetry-error">Unable to validate: {validationError}</div>
+              ) : (
+                <div
+                  style={{
+                    border: `1px solid ${verdict === 'Correct' ? 'rgba(0,190,150,0.35)' : 'rgba(255,75,110,0.35)'}`,
+                    background: verdict === 'Correct' ? 'rgba(0,190,150,0.08)' : 'rgba(255,75,110,0.08)',
+                    borderRadius: '8px',
+                    padding: '28px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                    Your Answer
+                  </div>
+                  <div style={{ fontSize: '2rem', fontWeight: 900, color: verdict === 'Correct' ? 'var(--accent-success)' : 'var(--accent-danger)' }}>
+                    {verdict === 'Correct' ? 'Correct' : 'Not Correct'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        ) : (
         <div className="solver-output-grid">
           <section className="solver-panel">
             <div className="solver-panel-head">
@@ -812,6 +869,7 @@ export default function SolvePage() {
             </div>
           </aside>
         </div>
+        )}
       </div>
     </div>
   );

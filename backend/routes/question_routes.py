@@ -98,6 +98,19 @@ class NaturalQuestionFormatRequest(BaseModel):
     question: str
 
 
+def _build_solution_fallback(question: Question, solution_steps: list[dict], correct_answer: str | None) -> str:
+    intro = (
+        f"Start by identifying the required method for {question.title}. "
+        "Then simplify the expression carefully and keep each algebraic step connected to the previous one."
+    )
+    step_text = " ".join(
+        f"Step {step.get('step')}: {step.get('title')}. {step.get('detail')}"
+        for step in solution_steps
+    )
+    answer_text = f" The final answer is {correct_answer}." if correct_answer else ""
+    return f"{intro} {step_text}{answer_text}".strip()
+
+
 def _fallback_format_natural_question(question: str) -> dict:
     text = (question or "").strip()
     lowered = text.lower()
@@ -258,6 +271,71 @@ async def parse_expression_image(
         return data
     except Exception as e:
         return {"expression": "", "error": f"Failed to parse image: {str(e)}"}
+
+
+@router.get("/{question_id}/solution")
+async def get_question_solution(
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user),
+):
+    """Student-facing explanation for a question, with text usable by TTS."""
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can view solution explanations")
+
+    q = db.query(Question).filter(Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    from validation_engine import compute_correct_answer, generate_solution_steps, infer_problem_type
+    from ai_engine import get_ai_response
+
+    problem_type = q.problem_type or infer_problem_type(q.problem_expr or "")
+    solution_steps = generate_solution_steps(q.problem_expr, problem_type)
+    correct_answer = compute_correct_answer(q.problem_expr, problem_type)
+    fallback = _build_solution_fallback(q, solution_steps, correct_answer)
+
+    system_prompt = (
+        "You are a patient mathematics tutor. Explain the solution for a student. "
+        "Start with a clear text explanation before listing steps. "
+        "Keep it concise, friendly, and mathematically accurate. "
+        "Return ONLY JSON with keys: explanation, steps, voice_script. "
+        "steps must be an array of short strings. voice_script should be natural spoken text."
+    )
+    user_prompt = json.dumps({
+        "title": q.title,
+        "problem": q.problem_expr,
+        "topic": q.topic,
+        "reference_steps": solution_steps,
+        "correct_answer": correct_answer,
+    })
+
+    explanation = fallback
+    voice_script = fallback
+    step_strings = [
+        f"{step.get('title')}: {step.get('detail')}"
+        for step in solution_steps
+    ]
+
+    try:
+        raw = await get_ai_response(user_prompt, system_prompt)
+        parsed = _extract_json_object(raw)
+        if parsed:
+            explanation = parsed.get("explanation") or explanation
+            voice_script = parsed.get("voice_script") or explanation
+            if isinstance(parsed.get("steps"), list) and parsed["steps"]:
+                step_strings = [str(step) for step in parsed["steps"]]
+    except Exception:
+        pass
+
+    return {
+        "question": _serialize_question(q),
+        "explanation": explanation,
+        "steps": step_strings,
+        "voice_script": voice_script,
+        "correct_answer": correct_answer,
+        "solution_steps": solution_steps,
+    }
 
 
 @router.get("/{question_id}/answer")

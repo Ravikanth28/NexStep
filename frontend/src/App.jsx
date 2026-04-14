@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import QuestionsPage from './pages/QuestionsPage';
 import SignupPage from './pages/SignupPage';
 import SolvePage from './pages/SolvePage';
+import SolutionPage from './pages/SolutionPage';
 import StudentDashboard from './pages/StudentDashboard';
 import SubmissionReportPage from './pages/SubmissionReportPage';
 import TeacherDashboard from './pages/TeacherDashboard';
@@ -12,10 +13,20 @@ function Navbar({ user, onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
+  const isAuth = location.pathname === '/login' || location.pathname === '/signup';
+  const useHomeNav = isHome || isAuth;
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+  const goHomeSection = (sectionId) => {
+    if (!isHome) {
+      navigate('/');
+      setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' }), 50);
+      return;
+    }
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
-    <nav className={`navbar ${isHome ? 'navbar-home' : ''}`}>
+    <nav className={`navbar ${useHomeNav ? 'navbar-home' : ''}`}>
       <Link to="/" className="navbar-brand">
         <div className="brand-mark">Nx</div>
         <div className="brand-info">
@@ -23,12 +34,12 @@ function Navbar({ user, onLogout }) {
         </div>
       </Link>
 
-      {isHome && !user && (
+      {useHomeNav && !user && (
         <div className="navbar-pill-nav">
-          <button className="nav-pill-link nav-pill-link-active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Home</button>
-          <button className="nav-pill-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
+          <button className={`nav-pill-link ${isHome ? 'nav-pill-link-active' : ''}`} onClick={() => navigate('/')}>Home</button>
+          <button className="nav-pill-link" onClick={() => goHomeSection('features')}>Features</button>
           <button className="nav-pill-link" onClick={() => navigate('/signup')}>Simulator</button>
-          <button className="nav-pill-link" onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}>About</button>
+          <button className="nav-pill-link" onClick={() => goHomeSection('about')}>About</button>
         </div>
       )}
 
@@ -201,6 +212,14 @@ export default function App() {
           element={(
             <ProtectedRoute user={user}>
               <SolvePage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/solution/:id"
+          element={(
+            <ProtectedRoute user={user} requiredRole="student">
+              <SolutionPage />
             </ProtectedRoute>
           )}
         />
