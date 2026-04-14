@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 from database import get_db
 from models import Question, User
@@ -59,15 +59,32 @@ def _resolve_user(user_data: dict = Depends(get_current_user), db: Session = Dep
 
 
 @router.get("")
-def list_questions(difficulty: str = None, topic: str = None, db: Session = Depends(get_db)):
-    query = db.query(Question)
+def list_questions(
+    difficulty: str = None,
+    topic: str = None,
+    page: int = 1,
+    limit: int = 20,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Question).options(joinedload(Question.creator))
     if difficulty:
         query = query.filter(Question.difficulty == difficulty)
     if topic and topic != "All":
         query = query.filter(Question.topic == topic)
-        
-    questions = query.order_by(Question.created_at.desc()).all()
-    return [_serialize_question(q) for q in questions]
+
+    total = query.count()
+    questions = (
+        query.order_by(Question.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "questions": [_serialize_question(q) for q in questions],
+        "total": total,
+        "page": page,
+        "pages": max(1, -(-total // limit)),  # ceiling division
+    }
 
 
 @router.get("/meta/syllabus")

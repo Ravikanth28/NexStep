@@ -37,12 +37,13 @@ export const signup = (body) => request('/auth/signup', { method: 'POST', body: 
 export const login = (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
 
 // Questions
-export const getQuestions = (difficulty, topic) => {
+export const getQuestions = (difficulty, topic, page = 1, limit = 20) => {
   const params = new URLSearchParams();
   if (difficulty) params.append('difficulty', difficulty);
   if (topic && topic !== 'All') params.append('topic', topic);
-  const qStr = params.toString();
-  return request(`/questions${qStr ? `?${qStr}` : ''}`);
+  params.append('page', page);
+  params.append('limit', limit);
+  return request(`/questions?${params.toString()}`);
 };
 export const getQuestion = (id) => request(`/questions/${id}`);
 export const getQuestionSolution = (id) => request(`/questions/${id}/solution`);

@@ -20,6 +20,32 @@ const SYLLABUS_TOPICS = [
   'Hypothesis Testing',
 ];
 
+const PAGE_SIZE = 20;
+
+function SkeletonCard() {
+  return (
+    <div className="card" style={{ padding: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+        <div style={{ flex: 1 }}>
+          <div className="skeleton" style={{ width: '65%', height: '18px', marginBottom: '10px' }} />
+          <div className="skeleton" style={{ width: '40%', height: '12px' }} />
+        </div>
+        <div className="skeleton" style={{ width: '64px', height: '28px', borderRadius: '999px', marginLeft: '12px' }} />
+      </div>
+      <div className="skeleton" style={{ width: '100%', height: '60px', marginTop: '20px', borderRadius: '12px' }} />
+      <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+        <div className="skeleton" style={{ width: '80px', height: '28px', borderRadius: '6px' }} />
+        <div className="skeleton" style={{ width: '110px', height: '28px', borderRadius: '6px' }} />
+        <div className="skeleton" style={{ width: '75px', height: '28px', borderRadius: '6px' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '22px' }}>
+        <div className="skeleton" style={{ height: '38px', borderRadius: '8px' }} />
+        <div className="skeleton" style={{ height: '38px', borderRadius: '8px' }} />
+      </div>
+    </div>
+  );
+}
+
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState([]);
   const [difficulty, setDifficulty] = useState('');
@@ -28,19 +54,28 @@ export default function QuestionsPage() {
   const [loading, setLoading] = useState(true);
   const [revealedAnswers, setRevealedAnswers] = useState({});
   const [loadingAnswer, setLoadingAnswer] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const navigate = useNavigate();
 
   const user = JSON.parse(localStorage.getItem('user') || 'null');
 
   useEffect(() => {
-    loadQuestions();
+    setPage(1);
   }, [difficulty, topic]);
+
+  useEffect(() => {
+    loadQuestions();
+  }, [difficulty, topic, page]);
 
   const loadQuestions = async () => {
     setLoading(true);
     try {
-      const data = await getQuestions(difficulty, topic);
-      setQuestions(data);
+      const data = await getQuestions(difficulty, topic, page, PAGE_SIZE);
+      setQuestions(data.questions);
+      setTotalPages(data.pages);
+      setTotal(data.total);
     } catch (err) {
       console.error(err);
     } finally {
@@ -92,11 +127,11 @@ export default function QuestionsPage() {
             <p className="hero-subtitle">Browse and solve questions across all topics. AI checks your steps in real time.</p>
           </div>
           
-          <div className="card" style={{ background: 'rgba(255,255,255,0.88)', borderColor: 'rgba(46,60,181,0.15)', padding: '32px' }}>
+          <div className="card" style={{ padding: '32px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Questions</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{visibleQuestions.length}</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{total}</div>
               </div>
               <div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Avg. Confidence</div>
@@ -150,7 +185,7 @@ export default function QuestionsPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by title, expression, or topic..."
-                  style={{ background: 'rgba(255,255,255,0.90)', borderRadius: '12px', padding: '16px 24px' }}
+                  style={{ borderRadius: '12px', padding: '16px 24px' }}
                 />
                 <div className="tab-strip" style={{ margin: 0 }}>
                   {['', 'easy', 'medium', 'hard'].map((value) => (
@@ -167,8 +202,8 @@ export default function QuestionsPage() {
             </div>
 
             {loading ? (
-              <div className="empty-state">
-                <div className="spinner" style={{ margin: '0 auto', width: 40, height: 40, borderWidth: '4px' }}></div>
+              <div className="questions-grid">
+                {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : visibleQuestions.length === 0 ? (
               <div className="card empty-state" style={{ minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -177,13 +212,14 @@ export default function QuestionsPage() {
                 <p>Try re-configuring your filters or search terms.</p>
               </div>
             ) : (
+              <>
               <div className="questions-grid">
                 {visibleQuestions.map((question, index) => (
                   <div
                     key={question.id}
                     className="question-card"
                     style={{ 
-                      animationDelay: `${index * 0.05}s`,
+                      animationDelay: `${index * 0.04}s`,
                       textAlign: 'left',
                       cursor: 'pointer',
                       width: '100%',
@@ -255,12 +291,12 @@ export default function QuestionsPage() {
                             <div style={{
                               marginTop: '10px',
                               padding: '14px 16px',
-                              background: 'rgba(46,60,181,0.06)',
-                              border: '1px solid rgba(46,60,181,0.20)',
+                              background: 'rgba(79,122,248,0.08)',
+                              border: '1px solid rgba(79,122,248,0.22)',
                               borderRadius: '8px',
                             }}>
-                              <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#2e3cb5', marginBottom: '6px' }}>CORRECT ANSWER</div>
-                              <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', color: '#2e3cb5', wordBreak: 'break-all' }}>
+                              <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#6b93ff', marginBottom: '6px' }}>CORRECT ANSWER</div>
+                              <div style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', color: '#6b93ff', wordBreak: 'break-all' }}>
                                 {revealedAnswers[question.id]}
                               </div>
                             </div>
@@ -271,6 +307,44 @@ export default function QuestionsPage() {
                   </div>
                 ))}
               </div>
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '40px', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-outline"
+                    style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    ← Prev
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                    .map((p, idx, arr) => (
+                      <span key={p} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span style={{ color: 'var(--text-muted)', padding: '0 2px' }}>…</span>
+                        )}
+                        <button
+                          className={`tab-pill ${page === p ? 'active' : ''}`}
+                          style={{ minWidth: '44px', justifyContent: 'center', padding: '10px 16px' }}
+                          onClick={() => setPage(p)}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    ))
+                  }
+                  <button
+                    className="btn btn-outline"
+                    style={{ padding: '10px 20px', fontSize: '0.85rem' }}
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </main>
         </div>
