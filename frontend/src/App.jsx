@@ -17,9 +17,16 @@ function Navbar({ user, onLogout }) {
   const isAboutPage = location.pathname === '/about';
   const useHomeNav = isHome || isFeaturePage || isAboutPage;
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    <nav className={`navbar ${useHomeNav ? 'navbar-home' : ''}`}>
+    <nav className={`navbar ${useHomeNav ? 'navbar-home' : ''} ${scrolled ? 'navbar-scrolled' : ''}`}>
       <Link to="/" className="navbar-brand">
         <div className="brand-mark">Nx</div>
         <div className="brand-info">
@@ -27,7 +34,7 @@ function Navbar({ user, onLogout }) {
         </div>
       </Link>
 
-      {useHomeNav && !user && (
+      {useHomeNav && (
         <div className="navbar-pill-nav">
           <button className={`nav-pill-link ${isHome ? 'nav-pill-link-active' : ''}`} onClick={() => navigate('/')}>Home</button>
           <button className={`nav-pill-link ${isFeaturePage ? 'nav-pill-link-active' : ''}`} onClick={() => navigate('/features')}>Features</button>
@@ -38,31 +45,38 @@ function Navbar({ user, onLogout }) {
       <div className="navbar-links" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
         {user ? (
           <>
-            <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>Workspace</Link>
-            {user.role === 'student' && (
-              <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>Analytics</Link>
+            {!useHomeNav && (
+              <>
+                <Link to="/questions" className={`nav-link ${isActive('/questions') ? 'active' : ''}`}>Workspace</Link>
+                {user.role === 'student' && (
+                  <Link to="/progress" className={`nav-link ${isActive('/progress') ? 'active' : ''}`}>Analytics</Link>
+                )}
+                {user.role === 'teacher' && (
+                  <Link to="/teacher" className={`nav-link ${isActive('/teacher') ? 'active' : ''}`}>Control</Link>
+                )}
+              </>
             )}
-            {user.role === 'teacher' && (
-              <Link to="/teacher" className={`nav-link ${isActive('/teacher') ? 'active' : ''}`}>Control</Link>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '12px', paddingLeft: '16px', borderLeft: '1px solid var(--border-main)' }}>
+            <div className="navbar-user-info">
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{user.username}</div>
-                <div className="badge badge-easy" style={{ fontSize: '0.65rem', padding: '2px 8px', marginTop: '4px' }}>{user.role}</div>
+                <div className="navbar-username">{user.username}</div>
+                <div className={`navbar-role-badge ${user.role === 'teacher' ? 'role-teacher' : 'role-student'}`}>
+                  {user.role}
+                </div>
               </div>
-              <button className="btn btn-outline" style={{ padding: '8px 16px', fontSize: '0.8rem' }} onClick={onLogout}>Logout</button>
+              <button className="btn btn-outline navbar-logout-btn" onClick={onLogout}>Logout</button>
             </div>
           </>
         ) : (
           <>
             <Link to="/login" className="nav-link">Sign In</Link>
-            <Link to="/signup" className="btn btn-primary" style={{ padding: '10px 24px' }}>Start Free</Link>
+            <Link to="/signup" className="btn btn-primary navbar-cta-btn">Start Free</Link>
           </>
         )}
       </div>
     </nav>
   );
 }
+
 function ProtectedRoute({ children, user, requiredRole }) {
   if (!user) return <Navigate to="/login" replace />;
   if (requiredRole && user.role !== requiredRole) return <Navigate to="/" replace />;
@@ -71,32 +85,32 @@ function ProtectedRoute({ children, user, requiredRole }) {
 
 const featureItems = [
   {
-    icon: 'AI',
+    icon: '⚡',
     title: 'Neural Parsing',
     text: 'Vector calculus, tensor fields, ODEs, transforms, and symbolic expressions stay readable from the first step.',
   },
   {
-    icon: 'RT',
+    icon: '🔀',
     title: 'Symbolic Routing',
     text: 'Every question is routed by topic and strategy so students land in the right solving flow.',
   },
   {
-    icon: 'OK',
+    icon: '✓',
     title: 'Answer Checking',
     text: 'Student submissions return a clear correct or not-correct result without exposing the reference engine.',
   },
   {
-    icon: 'VO',
+    icon: '🔊',
     title: 'Voice Explanations',
     text: 'Solution pages can speak through the walkthrough at a pace that feels comfortable.',
   },
   {
-    icon: 'PR',
+    icon: '📊',
     title: 'Progress Analytics',
     text: 'Students can revisit attempts while teachers see learning signals across the class.',
   },
   {
-    icon: 'TC',
+    icon: '🎯',
     title: 'Teacher Control',
     text: 'Teachers create questions, review performance, and keep practice aligned to the syllabus.',
   },
@@ -108,16 +122,14 @@ function FeaturesPage() {
   return (
     <div className="page home-page home-detail-page">
       <div className="home-hero-wrap home-detail-hero">
-        <div className="home-ann home-ann-bl">
-          <p>Choose a problem,<br />solve it cleanly,<br />then check.</p>
-        </div>
-        <div className="home-ann home-ann-tr">
-          <p>Practice, feedback,<br />voice guidance,<br />and progress.</p>
-        </div>
-
+        <div className="home-hero-glow" />
         <div className="home-headline-block">
+          <div className="home-hero-badge">
+            <span className="home-hero-badge-dot" />
+            Platform Capabilities
+          </div>
           <p className="home-hl">
-            Built&nbsp;<span className="home-blob">AI</span>&nbsp;for
+            Built&nbsp;<span className="home-blob">⚡</span>&nbsp;for
           </p>
           <p className="home-hl">
             step&nbsp;<span className="home-blob home-blob-wide">by step</span>&nbsp;math
@@ -125,23 +137,28 @@ function FeaturesPage() {
           <p className="home-hl home-hl-accent">
             practice!
           </p>
+          <p className="home-hero-desc">
+            Choose a problem, solve it cleanly, then check. Practice, feedback, voice guidance, and progress — all in one workspace.
+          </p>
         </div>
 
         <div className="home-pill-ctas">
-          <div className="home-pill home-pill-ghost">
-            <span className="home-pill-nav">&lt;&lt;</span>
-            <button className="home-pill-btn" onClick={() => navigate('/')}>Back Home</button>
-            <span className="home-pill-icon">Nx</span>
+          <div className="home-pill home-pill-ghost" onClick={() => navigate('/')}>
+            <span className="home-pill-icon">←</span>
+            <span className="home-pill-btn">Back Home</span>
           </div>
-          <div className="home-pill home-pill-solid">
-            <span className="home-pill-icon">Go</span>
-            <button className="home-pill-btn" onClick={() => navigate('/signup')}>Start Free</button>
-            <span className="home-pill-nav">&gt;&gt;</span>
+          <div className="home-pill home-pill-solid" onClick={() => navigate('/signup')}>
+            <span className="home-pill-icon">→</span>
+            <span className="home-pill-btn">Start Free</span>
           </div>
         </div>
       </div>
 
       <div className="home-features-wrap">
+        <div className="home-section-header">
+          <span className="home-section-badge">All Features</span>
+          <h2 className="home-section-title">Everything you need for<br/><span className="text-gradient">mathematical excellence</span></h2>
+        </div>
         <div className="home-features home-features-expanded">
           {featureItems.map((item) => (
             <div className="feature-card" key={item.title}>
@@ -162,14 +179,12 @@ function AboutPage() {
   return (
     <div className="page home-page home-detail-page">
       <div className="home-hero-wrap home-detail-hero">
-        <div className="home-ann home-ann-bl">
-          <p>Made for students<br />who learn by<br />doing.</p>
-        </div>
-        <div className="home-ann home-ann-tr">
-          <p>Made for teachers<br />who need clear<br />signals.</p>
-        </div>
-
+        <div className="home-hero-glow" />
         <div className="home-headline-block">
+          <div className="home-hero-badge">
+            <span className="home-hero-badge-dot" />
+            About NexStep
+          </div>
           <p className="home-hl">
             Math&nbsp;<span className="home-blob">Nx</span>&nbsp;feels
           </p>
@@ -179,42 +194,45 @@ function AboutPage() {
           <p className="home-hl home-hl-accent">
             step matters!
           </p>
+          <p className="home-hero-desc">
+            Made for students who learn by doing. Made for teachers who need clear signals.
+          </p>
         </div>
 
         <div className="home-pill-ctas">
-          <div className="home-pill home-pill-ghost">
-            <span className="home-pill-nav">&lt;&lt;</span>
-            <button className="home-pill-btn" onClick={() => navigate('/features')}>See Features</button>
-            <span className="home-pill-icon">AI</span>
+          <div className="home-pill home-pill-ghost" onClick={() => navigate('/features')}>
+            <span className="home-pill-icon">⚡</span>
+            <span className="home-pill-btn">See Features</span>
           </div>
-          <div className="home-pill home-pill-solid">
-            <span className="home-pill-icon">Go</span>
-            <button className="home-pill-btn" onClick={() => navigate('/signup')}>Join NexStep</button>
-            <span className="home-pill-nav">&gt;&gt;</span>
+          <div className="home-pill home-pill-solid" onClick={() => navigate('/signup')}>
+            <span className="home-pill-icon">→</span>
+            <span className="home-pill-btn">Join NexStep</span>
           </div>
         </div>
       </div>
 
-      <div className="home-about-band">
-        <div>
-          <div className="hero-kicker">About NexStep</div>
-          <h2>Practice stays focused. Feedback stays useful.</h2>
-          <p>
-            NexStep brings problem solving, validation, solution walkthroughs, and performance tracking into one mathematics workspace.
-          </p>
-        </div>
-        <div className="home-about-points">
+      <div className="home-about-section">
+        <div className="home-about-band">
           <div>
-            <span>01</span>
-            <p>Students work through problems in a clean editor and get a simple answer check.</p>
+            <div className="hero-kicker">Our Mission</div>
+            <h2>Practice stays focused.<br/>Feedback stays useful.</h2>
+            <p>
+              NexStep brings problem solving, validation, solution walkthroughs, and performance tracking into one mathematics workspace.
+            </p>
           </div>
-          <div>
-            <span>02</span>
-            <p>Solution pages explain the method first, then support voice playback.</p>
-          </div>
-          <div>
-            <span>03</span>
-            <p>Teachers keep questions, class progress, and review tools close together.</p>
+          <div className="home-about-points">
+            <div>
+              <span>01</span>
+              <p>Students work through problems in a clean editor and get a simple answer check.</p>
+            </div>
+            <div>
+              <span>02</span>
+              <p>Solution pages explain the method first, then support voice playback.</p>
+            </div>
+            <div>
+              <span>03</span>
+              <p>Teachers keep questions, class progress, and review tools close together.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -230,17 +248,14 @@ function HomePage({ user }) {
 
       {/* ── Hero ── */}
       <div className="home-hero-wrap">
-
-        {/* Floating annotations */}
-        <div className="home-ann home-ann-bl">
-          <p>If you don't know where<br />to start, try the guided<br />tour first.</p>
-        </div>
-        <div className="home-ann home-ann-tr">
-          <p>Solve your mathematics<br />problems powered<br />by our AI engine.</p>
-        </div>
+        <div className="home-hero-glow" />
 
         {/* Big headline */}
         <div className="home-headline-block">
+          <div className="home-hero-badge">
+            <span className="home-hero-badge-dot" />
+            AI-Powered Mathematics
+          </div>
           <p className="home-hl">
             It's&nbsp;<span className="home-blob">⚡</span>&nbsp;time
           </p>
@@ -250,29 +265,20 @@ function HomePage({ user }) {
           <p className="home-hl home-hl-accent">
             mathematics!
           </p>
+          <p className="home-hero-desc">
+            Solve your mathematics problems powered by our AI engine. Step-by-step verification, voice walkthroughs, and real-time feedback.
+          </p>
         </div>
 
         {/* Pill CTAs */}
         <div className="home-pill-ctas">
-          <div className="home-pill home-pill-ghost">
-            <span className="home-pill-nav">‹‹</span>
-            <button
-              className="home-pill-btn"
-              onClick={() => navigate(user ? (user.role === 'teacher' ? '/teacher' : '/questions') : '/signup')}
-            >
-              {user ? 'Open Workspace' : 'Get Started Free'}
-            </button>
+          <div className="home-pill home-pill-ghost" onClick={() => navigate(user ? (user.role === 'teacher' ? '/teacher' : '/questions') : '/signup')}>
             <span className="home-pill-icon">🗺</span>
+            <span className="home-pill-btn">{user ? 'Open Workspace' : 'Get Started Free'}</span>
           </div>
-          <div className="home-pill home-pill-solid">
+          <div className="home-pill home-pill-solid" onClick={() => navigate(user ? '/questions' : '/login')}>
             <span className="home-pill-icon">⌘</span>
-            <button
-              className="home-pill-btn"
-              onClick={() => navigate(user ? '/questions' : '/login')}
-            >
-              {user ? 'Enter Studio' : 'Sign In'}
-            </button>
-            <span className="home-pill-nav">&gt;&gt;</span>
+            <span className="home-pill-btn">{user ? 'Enter Studio' : 'Sign In'}</span>
           </div>
         </div>
 
@@ -280,6 +286,10 @@ function HomePage({ user }) {
 
       {/* ── Feature Cards ── */}
       <div className="home-features-wrap" id="features">
+        <div className="home-section-header">
+          <span className="home-section-badge">Core Capabilities</span>
+          <h2 className="home-section-title">Powered by <span className="text-gradient">cutting-edge AI</span></h2>
+        </div>
         <div className="home-features">
           <div className="feature-card">
             <div className="feature-icon">⚡</div>
@@ -300,12 +310,26 @@ function HomePage({ user }) {
       </div>
 
       {/* ── About ── */}
-      <div id="about" style={{ padding: '48px 80px 72px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.40)' }}>
-        <p style={{ fontSize: '1.7rem', fontWeight: 800, color: '#0a1628', marginBottom: '14px' }}>Built for serious mathematics.</p>
-        <p style={{ color: '#1e3a5a', fontSize: '1rem', maxWidth: '600px', margin: '0 auto', lineHeight: 1.85 }}>
-          NexStep combines AI-powered symbolic reasoning with step-by-step pedagogy to help students master advanced mathematics.
-        </p>
+      <div className="home-about-section">
+        <div className="home-about-content">
+          <div className="home-section-badge">Why NexStep</div>
+          <h2 className="home-section-title" style={{ marginBottom: '16px' }}>Built for serious mathematics.</h2>
+          <p className="home-about-text">
+            NexStep combines AI-powered symbolic reasoning with step-by-step pedagogy to help students master advanced mathematics.
+          </p>
+        </div>
       </div>
+
+      {/* ── Footer ── */}
+      <footer className="home-footer">
+        <div className="home-footer-inner">
+          <div className="home-footer-brand">
+            <div className="brand-mark" style={{ width: 32, height: 32, fontSize: '0.7rem', borderRadius: 8 }}>Nx</div>
+            <span>NexStep</span>
+          </div>
+          <p>© 2026 NexStep. AI-powered mathematics education platform.</p>
+        </div>
+      </footer>
 
     </div>
   );
@@ -344,8 +368,8 @@ export default function App() {
         <Route path="/" element={<HomePage user={user} />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/about" element={<AboutPage />} />
-        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-        <Route path="/signup" element={<SignupPage onLogin={handleLogin} />} />
+        <Route path="/login" element={user ? <Navigate to={user.role === 'teacher' ? '/teacher' : '/questions'} replace /> : <LoginPage onLogin={handleLogin} />} />
+        <Route path="/signup" element={user ? <Navigate to={user.role === 'teacher' ? '/teacher' : '/questions'} replace /> : <SignupPage onLogin={handleLogin} />} />
         <Route
           path="/questions"
           element={(
