@@ -346,7 +346,7 @@ export default function SolvePage() {
   const invalidCount = results ? results.length - validCount : 0;
 
   return (
-    <div className="page solve-screen" style={{ padding: '0 0 60px 0' }}>
+    <div className="page solve-screen student-page" style={{ padding: '0 0 60px 0' }}>
       <div className="container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <button className="btn btn-outline" style={{ padding: '10px 20px' }} onClick={() => navigate('/questions')}>

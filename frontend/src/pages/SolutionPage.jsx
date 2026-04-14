@@ -107,7 +107,7 @@ export default function SolutionPage() {
   const question = data.question;
 
   return (
-    <div className="page" style={{ padding: '0 0 60px 0' }}>
+    <div className="page student-page" style={{ padding: '0 0 60px 0' }}>
       <div className="container">
         <div style={{ marginBottom: '28px' }}>
           <button className="btn btn-outline" style={{ padding: '10px 20px' }} onClick={() => navigate('/questions')}>

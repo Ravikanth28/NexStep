@@ -91,7 +91,7 @@ export default function StudentDashboard() {
   if (!dashboard) return null;
 
   return (
-    <div className="page" style={{ padding: '0 0 60px 0' }}>
+    <div className="page student-page" style={{ padding: '0 0 60px 0' }}>
       <div className="container">
         <section className="workspace-hero" style={{ padding: '60px', gridTemplateColumns: '1fr 450px', alignItems: 'center' }}>
           <div>

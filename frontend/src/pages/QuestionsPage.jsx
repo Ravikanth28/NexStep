@@ -83,9 +83,9 @@ export default function QuestionsPage() {
     : 0;
 
   return (
-    <div className="page" style={{ padding: '0 0 60px 0' }}>
+    <div className="page student-page" style={{ padding: '0 0 60px 0' }}>
       <div className="container">
-        <section className="workspace-hero" style={{ padding: '60px', gridTemplateColumns: '1fr 380px' }}>
+        <section className="workspace-hero" style={{ padding: '44px 60px', gridTemplateColumns: '1fr 380px' }}>
           <div>
             <div className="hero-kicker">Practice</div>
             <h1 className="hero-title"><span className="text-gradient">Mathematics</span><br />Questions.</h1>

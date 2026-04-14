@@ -13,17 +13,10 @@ function Navbar({ user, onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
-  const isAuth = location.pathname === '/login' || location.pathname === '/signup';
-  const useHomeNav = isHome || isAuth;
+  const isFeaturePage = location.pathname === '/features';
+  const isAboutPage = location.pathname === '/about';
+  const useHomeNav = isHome || isFeaturePage || isAboutPage;
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
-  const goHomeSection = (sectionId) => {
-    if (!isHome) {
-      navigate('/');
-      setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' }), 50);
-      return;
-    }
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   return (
     <nav className={`navbar ${useHomeNav ? 'navbar-home' : ''}`}>
@@ -37,9 +30,8 @@ function Navbar({ user, onLogout }) {
       {useHomeNav && !user && (
         <div className="navbar-pill-nav">
           <button className={`nav-pill-link ${isHome ? 'nav-pill-link-active' : ''}`} onClick={() => navigate('/')}>Home</button>
-          <button className="nav-pill-link" onClick={() => goHomeSection('features')}>Features</button>
-          <button className="nav-pill-link" onClick={() => navigate('/signup')}>Simulator</button>
-          <button className="nav-pill-link" onClick={() => goHomeSection('about')}>About</button>
+          <button className={`nav-pill-link ${isFeaturePage ? 'nav-pill-link-active' : ''}`} onClick={() => navigate('/features')}>Features</button>
+          <button className={`nav-pill-link ${isAboutPage ? 'nav-pill-link-active' : ''}`} onClick={() => navigate('/about')}>About</button>
         </div>
       )}
 
@@ -75,6 +67,159 @@ function ProtectedRoute({ children, user, requiredRole }) {
   if (!user) return <Navigate to="/login" replace />;
   if (requiredRole && user.role !== requiredRole) return <Navigate to="/" replace />;
   return children;
+}
+
+const featureItems = [
+  {
+    icon: 'AI',
+    title: 'Neural Parsing',
+    text: 'Vector calculus, tensor fields, ODEs, transforms, and symbolic expressions stay readable from the first step.',
+  },
+  {
+    icon: 'RT',
+    title: 'Symbolic Routing',
+    text: 'Every question is routed by topic and strategy so students land in the right solving flow.',
+  },
+  {
+    icon: 'OK',
+    title: 'Answer Checking',
+    text: 'Student submissions return a clear correct or not-correct result without exposing the reference engine.',
+  },
+  {
+    icon: 'VO',
+    title: 'Voice Explanations',
+    text: 'Solution pages can speak through the walkthrough at a pace that feels comfortable.',
+  },
+  {
+    icon: 'PR',
+    title: 'Progress Analytics',
+    text: 'Students can revisit attempts while teachers see learning signals across the class.',
+  },
+  {
+    icon: 'TC',
+    title: 'Teacher Control',
+    text: 'Teachers create questions, review performance, and keep practice aligned to the syllabus.',
+  },
+];
+
+function FeaturesPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="page home-page home-detail-page">
+      <div className="home-hero-wrap home-detail-hero">
+        <div className="home-ann home-ann-bl">
+          <p>Choose a problem,<br />solve it cleanly,<br />then check.</p>
+        </div>
+        <div className="home-ann home-ann-tr">
+          <p>Practice, feedback,<br />voice guidance,<br />and progress.</p>
+        </div>
+
+        <div className="home-headline-block">
+          <p className="home-hl">
+            Built&nbsp;<span className="home-blob">AI</span>&nbsp;for
+          </p>
+          <p className="home-hl">
+            step&nbsp;<span className="home-blob home-blob-wide">by step</span>&nbsp;math
+          </p>
+          <p className="home-hl home-hl-accent">
+            practice!
+          </p>
+        </div>
+
+        <div className="home-pill-ctas">
+          <div className="home-pill home-pill-ghost">
+            <span className="home-pill-nav">&lt;&lt;</span>
+            <button className="home-pill-btn" onClick={() => navigate('/')}>Back Home</button>
+            <span className="home-pill-icon">Nx</span>
+          </div>
+          <div className="home-pill home-pill-solid">
+            <span className="home-pill-icon">Go</span>
+            <button className="home-pill-btn" onClick={() => navigate('/signup')}>Start Free</button>
+            <span className="home-pill-nav">&gt;&gt;</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="home-features-wrap">
+        <div className="home-features home-features-expanded">
+          {featureItems.map((item) => (
+            <div className="feature-card" key={item.title}>
+              <div className="feature-icon">{item.icon}</div>
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AboutPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="page home-page home-detail-page">
+      <div className="home-hero-wrap home-detail-hero">
+        <div className="home-ann home-ann-bl">
+          <p>Made for students<br />who learn by<br />doing.</p>
+        </div>
+        <div className="home-ann home-ann-tr">
+          <p>Made for teachers<br />who need clear<br />signals.</p>
+        </div>
+
+        <div className="home-headline-block">
+          <p className="home-hl">
+            Math&nbsp;<span className="home-blob">Nx</span>&nbsp;feels
+          </p>
+          <p className="home-hl">
+            clearer&nbsp;<span className="home-blob home-blob-wide">when</span>&nbsp;each
+          </p>
+          <p className="home-hl home-hl-accent">
+            step matters!
+          </p>
+        </div>
+
+        <div className="home-pill-ctas">
+          <div className="home-pill home-pill-ghost">
+            <span className="home-pill-nav">&lt;&lt;</span>
+            <button className="home-pill-btn" onClick={() => navigate('/features')}>See Features</button>
+            <span className="home-pill-icon">AI</span>
+          </div>
+          <div className="home-pill home-pill-solid">
+            <span className="home-pill-icon">Go</span>
+            <button className="home-pill-btn" onClick={() => navigate('/signup')}>Join NexStep</button>
+            <span className="home-pill-nav">&gt;&gt;</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="home-about-band">
+        <div>
+          <div className="hero-kicker">About NexStep</div>
+          <h2>Practice stays focused. Feedback stays useful.</h2>
+          <p>
+            NexStep brings problem solving, validation, solution walkthroughs, and performance tracking into one mathematics workspace.
+          </p>
+        </div>
+        <div className="home-about-points">
+          <div>
+            <span>01</span>
+            <p>Students work through problems in a clean editor and get a simple answer check.</p>
+          </div>
+          <div>
+            <span>02</span>
+            <p>Solution pages explain the method first, then support voice playback.</p>
+          </div>
+          <div>
+            <span>03</span>
+            <p>Teachers keep questions, class progress, and review tools close together.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function HomePage({ user }) {
@@ -197,6 +342,8 @@ export default function App() {
       <Navbar user={user} onLogout={handleLogout} />
       <Routes>
         <Route path="/" element={<HomePage user={user} />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         <Route path="/signup" element={<SignupPage onLogin={handleLogin} />} />
         <Route
