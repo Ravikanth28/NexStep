@@ -389,7 +389,7 @@ export default function App() {
         <Route
           path="/solution/:id"
           element={(
-            <ProtectedRoute user={user} requiredRole="student">
+            <ProtectedRoute user={user}>
               <SolutionPage />
             </ProtectedRoute>
           )}

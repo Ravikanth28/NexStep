@@ -259,16 +259,12 @@ async def validate_solution(
     db.refresh(submission)
     db.refresh(current_user)
 
-    # Save step logs
-    for step_result in result["steps"]:
-        step_log = StepLog(
-            submission_id=submission.id,
-            step_number=step_result["step"],
-            expression=step_result["expression"],
-            is_valid=step_result["valid"],
-            error_message=step_result.get("error")
-        )
-        db.add(step_log)
+    # Save step logs — one row per submission containing all steps as JSON
+    step_log = StepLog(
+        submission_id=submission.id,
+        steps_json=json.dumps(result["steps"]),
+    )
+    db.add(step_log)
     db.commit()
 
     return {
@@ -428,16 +424,11 @@ def get_submission_detail(
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    step_logs = sorted(submission.step_logs, key=lambda step: step.step_number)
-    steps = [
-        {
-            "step": step.step_number,
-            "expression": step.expression,
-            "valid": step.is_valid,
-            "error": step.error_message,
-        }
-        for step in step_logs
-    ]
+    step_log = submission.step_logs  # single row (uselist=False)
+    try:
+        steps = json.loads(step_log.steps_json) if step_log and step_log.steps_json else []
+    except Exception:
+        steps = []
     question = submission.question
 
     return {

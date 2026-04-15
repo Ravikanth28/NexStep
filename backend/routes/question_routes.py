@@ -293,14 +293,36 @@ async def get_question_solution(
     db: Session = Depends(get_db),
     current_user: User = Depends(_resolve_user),
 ):
-    """Student-facing explanation for a question, with text usable by TTS."""
-    if current_user.role != "student":
-        raise HTTPException(status_code=403, detail="Only students can view solution explanations")
+    """Student-facing explanation for a question, with text usable by TTS.
+    Returns the cached solution if available; otherwise generates and caches it."""
+    if current_user.role not in ("student", "teacher"):
+        raise HTTPException(status_code=403, detail="Access denied")
 
     q = db.query(Question).filter(Question.id == question_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="Question not found")
 
+    # ── Return cached solution if it exists ──────────────────────────────────
+    if q.cached_explanation and q.cached_steps:
+        try:
+            cached_step_strings = json.loads(q.cached_steps)
+        except Exception:
+            cached_step_strings = []
+        if cached_step_strings:
+            from validation_engine import generate_solution_steps, infer_problem_type
+            problem_type = q.problem_type or infer_problem_type(q.problem_expr or "")
+            solution_steps = generate_solution_steps(q.problem_expr, problem_type)
+            return {
+                "question": _serialize_question(q),
+                "explanation": q.cached_explanation,
+                "steps": cached_step_strings,
+                "voice_script": q.cached_voice_script or q.cached_explanation,
+                "correct_answer": q.cached_correct_answer,
+                "solution_steps": solution_steps,
+                "from_cache": True,
+            }
+
+    # ── Generate fresh solution ───────────────────────────────────────────────
     from validation_engine import compute_correct_answer, generate_solution_steps, infer_problem_type
     from ai_engine import get_ai_response
 
@@ -316,6 +338,10 @@ async def get_question_solution(
         "Do NOT write generic instructions such as 'count favorable outcomes' unless you also provide the actual count. "
         "Do NOT omit the final answer when correct_answer is provided. "
         "Keep it concise, friendly, and mathematically accurate. "
+        "IMPORTANT: Write all mathematical expressions in plain readable text, NOT LaTeX. "
+        "Use ASCII notation: write '-10/(Z-1)' not '\\frac{-10}{Z-1}', write 'sqrt(x)' not '\\sqrt{x}', "
+        "write 'Z^(-1)' not '\\mathcal{Z}^{-1}', write '*' or 'cdot' for multiplication. "
+        "Steps should read like a textbook written in plain English with inline math. "
         "Return ONLY JSON with keys: explanation, steps, voice_script. "
         "steps must be an array of short strings containing the worked calculation. "
         "voice_script should be natural spoken text."
@@ -360,6 +386,16 @@ async def get_question_solution(
     except Exception:
         pass
 
+    # ── Persist to cache ──────────────────────────────────────────────────────
+    try:
+        q.cached_explanation = explanation
+        q.cached_steps = json.dumps(step_strings)
+        q.cached_voice_script = voice_script
+        q.cached_correct_answer = str(correct_answer) if correct_answer is not None else None
+        db.commit()
+    except Exception:
+        db.rollback()
+
     return {
         "question": _serialize_question(q),
         "explanation": explanation,
@@ -367,6 +403,103 @@ async def get_question_solution(
         "voice_script": voice_script,
         "correct_answer": correct_answer,
         "solution_steps": solution_steps,
+        "from_cache": False,
+    }
+
+
+@router.post("/{question_id}/regenerate-solution")
+async def regenerate_question_solution(
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_resolve_user),
+):
+    """Teacher-only: clear the cached solution and regenerate a fresh one from the AI."""
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can regenerate solutions")
+
+    q = db.query(Question).filter(Question.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    # Clear cache so next load regenerates
+    q.cached_explanation = None
+    q.cached_steps = None
+    q.cached_voice_script = None
+    q.cached_correct_answer = None
+    db.commit()
+
+    # Generate fresh solution
+    from validation_engine import compute_correct_answer, generate_solution_steps, infer_problem_type
+    from ai_engine import get_ai_response
+
+    problem_type = q.problem_type or infer_problem_type(q.problem_expr or "")
+    solution_steps = generate_solution_steps(q.problem_expr, problem_type)
+    correct_answer = compute_correct_answer(q.problem_expr, problem_type)
+    fallback = _build_solution_fallback(q, solution_steps, correct_answer)
+
+    system_prompt = (
+        "You are a patient mathematics tutor. Give the complete worked answer, not just an approach. "
+        "Start with one clear explanation sentence, then list the actual mathematical steps. "
+        "Every step must include concrete equations, substitutions, counts, or simplifications from the given reference. "
+        "Do NOT write generic instructions such as 'count favorable outcomes' unless you also provide the actual count. "
+        "Do NOT omit the final answer when correct_answer is provided. "
+        "Keep it concise, friendly, and mathematically accurate. "
+        "IMPORTANT: Write all mathematical expressions in plain readable text, NOT LaTeX. "
+        "Use ASCII notation: write '-10/(Z-1)' not '\\frac{-10}{Z-1}', write 'sqrt(x)' not '\\sqrt{x}', "
+        "write 'Z^(-1)' not '\\mathcal{Z}^{-1}', write '*' or 'cdot' for multiplication. "
+        "Steps should read like a textbook written in plain English with inline math. "
+        "Return ONLY JSON with keys: explanation, steps, voice_script. "
+        "steps must be an array of short strings containing the worked calculation. "
+        "voice_script should be natural spoken text."
+    )
+    user_prompt = json.dumps({
+        "title": q.title,
+        "problem": q.problem_expr,
+        "topic": q.topic,
+        "reference_steps": solution_steps,
+        "correct_answer": correct_answer,
+    })
+
+    explanation = fallback
+    voice_script = fallback
+    step_strings = [
+        f"{step.get('title')}: {step.get('detail')}"
+        for step in solution_steps
+    ]
+
+    try:
+        if solution_steps or not q.problem_image:
+            raw = await get_ai_response(user_prompt, system_prompt)
+            parsed = _extract_json_object(raw)
+            if parsed:
+                explanation = parsed.get("explanation") or explanation
+                voice_script = parsed.get("voice_script") or explanation
+                if isinstance(parsed.get("steps"), list) and parsed["steps"]:
+                    candidate_steps = [str(step) for step in parsed["steps"]]
+                    candidate_text = " ".join(candidate_steps).lower()
+                    if not correct_answer or str(correct_answer).lower() in candidate_text:
+                        step_strings = candidate_steps
+    except Exception:
+        pass
+
+    # Save the new solution to cache
+    try:
+        q.cached_explanation = explanation
+        q.cached_steps = json.dumps(step_strings)
+        q.cached_voice_script = voice_script
+        q.cached_correct_answer = str(correct_answer) if correct_answer is not None else None
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return {
+        "question": _serialize_question(q),
+        "explanation": explanation,
+        "steps": step_strings,
+        "voice_script": voice_script,
+        "correct_answer": correct_answer,
+        "solution_steps": solution_steps,
+        "from_cache": False,
     }
 
 

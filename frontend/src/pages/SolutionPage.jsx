@@ -1,8 +1,98 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getQuestionSolution } from '../api';
+import { getQuestionSolution, regenerateQuestionSolution } from '../api';
 import { mathExprToSpeech, pauseSpeech, resumeSpeech, speak, stopSpeech } from '../utils/mathSpeech';
 import 'mathlive';
+
+/**
+ * Convert LaTeX math notation to readable plain text.
+ * Handles the most common patterns produced by AI models.
+ */
+function latexToReadable(text) {
+  if (!text || !/\\/.test(text)) return text;
+  let s = String(text);
+
+  // \frac{a}{b}  →  (a)/(b)
+  // handle nested braces by repeating until stable
+  for (let i = 0; i < 6; i++) {
+    s = s.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '($1)/($2)');
+  }
+  // \sqrt{x}  →  sqrt(x)
+  s = s.replace(/\\sqrt\{([^{}]*)\}/g, 'sqrt($1)');
+  s = s.replace(/\\sqrt\s+(\S+)/g, 'sqrt($1)');
+
+  // Superscripts / subscripts with braces
+  s = s.replace(/\^\{([^{}]*)\}/g, '^($1)');
+  s = s.replace(/_\{([^{}]*)\}/g, '_($1)');
+
+  // Named commands
+  s = s.replace(/\\mathcal\{([^{}]*)\}/g, '$1');
+  s = s.replace(/\\mathrm\{([^{}]*)\}/g, '$1');
+  s = s.replace(/\\mathbf\{([^{}]*)\}/g, '$1');
+  s = s.replace(/\\text\{([^{}]*)\}/g, '$1');
+  s = s.replace(/\\left\s*\\\{/g, '{');
+  s = s.replace(/\\right\s*\\\}/g, '}');
+  s = s.replace(/\\left\s*\(/g, '(');
+  s = s.replace(/\\right\s*\)/g, ')');
+  s = s.replace(/\\left\s*\[/g, '[');
+  s = s.replace(/\\right\s*\]/g, ']');
+  s = s.replace(/\\left/g, '');
+  s = s.replace(/\\right/g, '');
+
+  // Operators / symbols
+  s = s.replace(/\\cdot/g, '·');
+  s = s.replace(/\\times/g, '×');
+  s = s.replace(/\\div/g, '÷');
+  s = s.replace(/\\pm/g, '±');
+  s = s.replace(/\\mp/g, '∓');
+  s = s.replace(/\\geq/g, '≥');
+  s = s.replace(/\\leq/g, '≤');
+  s = s.replace(/\\neq/g, '≠');
+  s = s.replace(/\\approx/g, '≈');
+  s = s.replace(/\\infty/g, '∞');
+  s = s.replace(/\\pi/g, 'π');
+  s = s.replace(/\\alpha/g, 'α');
+  s = s.replace(/\\beta/g, 'β');
+  s = s.replace(/\\omega/g, 'ω');
+  s = s.replace(/\\sigma/g, 'σ');
+  s = s.replace(/\\theta/g, 'θ');
+  s = s.replace(/\\lambda/g, 'λ');
+  s = s.replace(/\\delta/g, 'δ');
+  s = s.replace(/\\Delta/g, 'Δ');
+  s = s.replace(/\\sum/g, 'Σ');
+  s = s.replace(/\\prod/g, 'Π');
+  s = s.replace(/\\int/g, '∫');
+  s = s.replace(/\\partial/g, '∂');
+  s = s.replace(/\\nabla/g, '∇');
+  s = s.replace(/\\exists/g, '∃');
+  s = s.replace(/\\forall/g, '∀');
+  s = s.replace(/\\in/g, '∈');
+  s = s.replace(/\\notin/g, '∉');
+  s = s.replace(/\\subset/g, '⊂');
+  s = s.replace(/\\cup/g, '∪');
+  s = s.replace(/\\cap/g, '∩');
+
+  // Z-transform shorthand
+  s = s.replace(/\\mathcal\{Z\}\^\{-1\}/g, 'Z⁻¹');
+  s = s.replace(/\\mathcal\{Z\}/g, 'Z');
+
+  // Escape sequences
+  s = s.replace(/\\\{/g, '{');
+  s = s.replace(/\\\}/g, '}');
+  s = s.replace(/\\,/g, ' ');
+  s = s.replace(/\\;/g, ' ');
+  s = s.replace(/\\!/g, '');
+  s = s.replace(/\\quad/g, '  ');
+  s = s.replace(/\\qquad/g, '   ');
+
+  // Strip remaining unknown backslash commands like \something
+  s = s.replace(/\\[a-zA-Z]+/g, '');
+
+  // Clean up stray braces
+  s = s.replace(/\{([^{}]*)\}/g, '$1');
+
+  return s.trim();
+}
 
 function splitWorkedStep(step) {
   const text = String(step || '').trim();
@@ -74,6 +164,11 @@ export default function SolutionPage() {
   const [voiceLang, setVoiceLang] = useState('en-IN');
   const [voiceSpeaker, setVoiceSpeaker] = useState('ritu');
   const [voicePace, setVoicePace] = useState(1.0);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState('');
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+  const isTeacher = currentUser?.role === 'teacher';
 
   useEffect(() => {
     let mounted = true;
@@ -136,6 +231,19 @@ export default function SolutionPage() {
     stopSpeech();
     setSpeaking(false);
     setPaused(false);
+  };
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    setRegenError('');
+    try {
+      const fresh = await regenerateQuestionSolution(id);
+      setData(fresh);
+    } catch (err) {
+      setRegenError(err.message || 'Failed to regenerate solution.');
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   if (loading) {
@@ -252,6 +360,21 @@ export default function SolutionPage() {
                 <div className="solver-kicker">Text First</div>
                 <h3 className="solver-title">Explanation</h3>
               </div>
+              {isTeacher && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                  <button
+                    className="btn btn-outline"
+                    style={{ padding: '8px 16px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+                    onClick={handleRegenerate}
+                    disabled={regenerating}
+                  >
+                    {regenerating ? 'Regenerating…' : '↻ Generate New Solution'}
+                  </button>
+                  {regenError && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--error, #f87171)' }}>{regenError}</span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="solver-panel-body solution-explanation-body" style={{ padding: '30px 34px', gap: '22px', lineHeight: 1.8 }}>
               <p className="solution-explanation-copy" style={{ margin: 0 }}>{data.explanation}</p>
@@ -261,7 +384,7 @@ export default function SolutionPage() {
                     <div key={`${index}-${step}`} className="solution-step">
                       <div className="solution-step-index">{index + 1}</div>
                       <div className="solution-step-detail solution-step-lines">
-                        {splitWorkedStep(step).map((line, lineIndex) => (
+                        {splitWorkedStep(latexToReadable(step)).map((line, lineIndex) => (
                           <span className="solution-step-line-text" key={`${index}-${lineIndex}`}>
                             {line}
                           </span>

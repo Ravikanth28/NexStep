@@ -2777,7 +2777,7 @@ math-field::part(virtual-keyboard-toggle) {
 }
 
 .solution-worked-list .solution-step {
-  align-items: center;
+  align-items: flex-start;
   border: 1px solid rgba(107, 147, 255, 0.32);
   border-left: 4px solid #6b93ff;
   background:
@@ -2800,7 +2800,9 @@ math-field::part(virtual-keyboard-toggle) {
   letter-spacing: 0.01em;
   text-shadow: 0 0 16px rgba(107, 147, 255, 0.28);
   overflow-wrap: anywhere;
-  word-break: normal;
+  word-break: break-word;
+  min-width: 0;
+  flex: 1;
 }
 
 .solution-step-lines {
@@ -2811,6 +2813,10 @@ math-field::part(virtual-keyboard-toggle) {
 
 .solution-step-line-text {
   display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.65;
 }
 
 .solution-step-explain {

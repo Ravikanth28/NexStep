@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import 'mathlive';
 import MathKeyboard from '../components/MathKeyboard';
 import {
@@ -7,11 +8,11 @@ import {
   deleteQuestion,
   downloadTeacherReport,
   formatNaturalQuestion,
-  getQuestionAnswer,
   getQuestions,
   getSyllabusMeta,
   getTeacherDashboard,
   parseExpressionImage,
+  regenerateQuestionSolution,
 } from '../api';
 
 const BUILDER_LIBRARY = [
@@ -44,6 +45,7 @@ const DEFAULT_FORM = {
 };
 
 export default function TeacherDashboard() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState('dashboard');
   const [dashboard, setDashboard] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -55,8 +57,7 @@ export default function TeacherDashboard() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [revealedAnswers, setRevealedAnswers] = useState({});
-  const [loadingAnswer, setLoadingAnswer] = useState(null);
+  const [regeneratingId, setRegeneratingId] = useState(null);
   const [builderItems, setBuilderItems] = useState([]);
   const [customBuilderToken, setCustomBuilderToken] = useState('');
   const [imageParseLoading, setImageParseLoading] = useState(false);
@@ -120,7 +121,7 @@ export default function TeacherDashboard() {
         getSyllabusMeta(),
       ]);
       setDashboard(dash);
-      setQuestions(qs);
+      setQuestions(Array.isArray(qs) ? qs : (qs.questions || []));
       setSyllabusMeta(meta.subjects || []);
     } catch (err) {
       console.error(err);
@@ -324,19 +325,14 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleRevealAnswer = async (qid) => {
-    if (revealedAnswers[qid]) {
-      setRevealedAnswers(prev => { const next = { ...prev }; delete next[qid]; return next; });
-      return;
-    }
-    setLoadingAnswer(qid);
+  const handleRegenerateSolution = async (qid) => {
+    setRegeneratingId(qid);
     try {
-      const data = await getQuestionAnswer(qid);
-      setRevealedAnswers(prev => ({ ...prev, [qid]: data.correct_answer || 'Unable to compute for this problem type.' }));
+      await regenerateQuestionSolution(qid);
     } catch (err) {
-      setRevealedAnswers(prev => ({ ...prev, [qid]: 'Error: ' + err.message }));
+      alert('Failed to regenerate: ' + err.message);
     } finally {
-      setLoadingAnswer(null);
+      setRegeneratingId(null);
     }
   };
 
@@ -801,28 +797,40 @@ export default function TeacherDashboard() {
                         style={{ marginTop: '12px', maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid var(--border-main)', objectFit: 'contain' }}
                       />
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', gap: '12px', flexWrap: 'wrap' }}>
-                      <button
-                        className="btn btn-outline"
-                        style={{
-                          padding: '8px 16px',
-                          fontSize: '0.8rem',
-                          flex: 1,
-                          borderColor: revealedAnswers[question.id] ? 'var(--accent-primary)' : undefined,
-                          color: revealedAnswers[question.id] ? 'var(--accent-primary)' : undefined,
-                        }}
-                        onClick={() => handleRevealAnswer(question.id)}
-                        disabled={loadingAnswer === question.id}
-                      >
-                        {loadingAnswer === question.id ? 'Computing…' : revealedAnswers[question.id] ? 'Hide Answer' : 'Reveal Answer'}
-                      </button>
-                      <button
-                        className="btn btn-outline"
-                        style={{ padding: '8px 16px', fontSize: '0.8rem', borderColor: 'var(--accent-danger)', color: 'var(--accent-danger)' }}
-                        onClick={() => handleDelete(question.id)}
-                      >
-                        Purge
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '24px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <button
+                          className="btn btn-primary"
+                          style={{ justifyContent: 'center', padding: '9px 14px', fontSize: '0.82rem' }}
+                          onClick={() => navigate(`/solve/${question.id}`)}
+                        >
+                          Solve
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          style={{ justifyContent: 'center', padding: '9px 14px', fontSize: '0.82rem' }}
+                          onClick={() => navigate(`/solution/${question.id}`)}
+                        >
+                          See Solution
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '8px 10px', fontSize: '0.78rem', color: 'var(--accent-secondary)', borderColor: 'var(--accent-secondary)' }}
+                          onClick={() => handleRegenerateSolution(question.id)}
+                          disabled={regeneratingId === question.id}
+                        >
+                          {regeneratingId === question.id ? 'Generating…' : '↻ Gen Solution'}
+                        </button>
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '8px 10px', fontSize: '0.78rem', borderColor: 'var(--accent-danger)', color: 'var(--accent-danger)' }}
+                          onClick={() => handleDelete(question.id)}
+                        >
+                          Purge
+                        </button>
+                      </div>
                     </div>
                     {revealedAnswers[question.id] && (
                       <div style={{

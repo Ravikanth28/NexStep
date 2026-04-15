@@ -47,6 +47,7 @@ export const getQuestions = (difficulty, topic, page = 1, limit = 20) => {
 };
 export const getQuestion = (id) => request(`/questions/${id}`);
 export const getQuestionSolution = (id) => request(`/questions/${id}/solution`);
+export const regenerateQuestionSolution = (id) => request(`/questions/${id}/regenerate-solution`, { method: 'POST' });
 export const createQuestion = (body) => request('/questions', { method: 'POST', body: JSON.stringify(body) });
 export const deleteQuestion = (id) => request(`/questions/${id}`, { method: 'DELETE' });
 export const getQuestionAnswer = (id) => request(`/questions/${id}/answer`);

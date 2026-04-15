@@ -37,6 +37,10 @@ class Question(Base):
     hints = Column(Text, default="[]")  # JSON array of hints
     allow_copy_paste = Column(Boolean, default=True)
     problem_image = Column(Text, nullable=True)  # base64 image of the expression (optional)
+    cached_explanation = Column(Text, nullable=True)
+    cached_steps = Column(Text, nullable=True)       # JSON array of step strings
+    cached_voice_script = Column(Text, nullable=True)
+    cached_correct_answer = Column(Text, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -58,17 +62,14 @@ class Submission(Base):
 
     user = relationship("User", back_populates="submissions")
     question = relationship("Question", back_populates="submissions")
-    step_logs = relationship("StepLog", back_populates="submission", cascade="all, delete-orphan")
+    step_logs = relationship("StepLog", back_populates="submission", cascade="all, delete-orphan", uselist=False)
 
 
 class StepLog(Base):
     __tablename__ = "step_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=False)
-    step_number = Column(Integer, nullable=False)
-    expression = Column(String(500), nullable=False)
-    is_valid = Column(Boolean, default=False)
-    error_message = Column(String(500), default=None)
+    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=False, unique=True)
+    steps_json = Column(Text, nullable=False, default="[]")  # JSON array of {step, expression, valid, error}
 
     submission = relationship("Submission", back_populates="step_logs")
