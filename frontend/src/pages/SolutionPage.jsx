@@ -4,6 +4,65 @@ import { getQuestionSolution } from '../api';
 import { mathExprToSpeech, pauseSpeech, resumeSpeech, speak, stopSpeech } from '../utils/mathSpeech';
 import 'mathlive';
 
+function splitWorkedStep(step) {
+  const text = String(step || '').trim();
+  if (text.length <= 90) return [text];
+
+  let remaining = text;
+  const lines = [];
+  const firstColon = remaining.indexOf(':');
+
+  if (firstColon > 0 && firstColon < 42) {
+    lines.push(remaining.slice(0, firstColon + 1).trim());
+    remaining = remaining.slice(firstColon + 1).trim();
+  }
+
+  remaining = remaining
+    .replace(/;\s*(?=at\b)/gi, '\n')
+    .replace(/,\s*(?=at\b)/gi, '\n')
+    .replace(/\s*(⇒|=>|->)\s*/g, '\n$1 ');
+
+  return lines.concat(
+    remaining
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+  );
+}
+
+function explainWorkedStep(step, index) {
+  const text = String(step || '').toLowerCase();
+
+  if (/\bn\(s\)|sample space|total/.test(text)) {
+    return 'This identifies all equally likely outcomes, which becomes the denominator of the probability.';
+  }
+  if (/\bn\(a\)|favourable|favorable|kings|queens|aces|even outcomes|odd outcomes/.test(text)) {
+    return 'This counts only the outcomes that satisfy the event, which becomes the numerator.';
+  }
+  if (/p\(a\)|probability formula|n\(a\)\s*\/\s*n\(s\)/.test(text)) {
+    return 'Now we place favorable outcomes over total outcomes using the basic probability rule.';
+  }
+  if (/simplify|final answer|=/.test(text) && /\d+\s*\/\s*\d+/.test(text)) {
+    return 'The fraction is reduced to its simplest exact form, which is the final probability.';
+  }
+  if (/formula|definition/.test(text)) {
+    return 'This writes the standard formula first so the substitution is mathematically grounded.';
+  }
+  if (/substitute|replace/.test(text)) {
+    return 'Here we put the given function or values into the formula before simplifying.';
+  }
+  if (/integration by parts|integrate|∫|integral/.test(text)) {
+    return 'This performs the required integration step and turns the expression into a simpler form.';
+  }
+  if (/boundary|limit|at x=|evaluate/.test(text)) {
+    return 'This applies the limits carefully so the definite expression becomes a concrete value.';
+  }
+
+  return index === 0
+    ? 'This starts the solution by setting up the main quantity we need to compute.'
+    : 'This continues the calculation by transforming the previous line toward the final answer.';
+}
+
 export default function SolutionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -124,8 +183,8 @@ export default function SolutionPage() {
               <div className="badge badge-medium">{question.topic}</div>
               <div className="badge badge-hard">{question.difficulty}</div>
             </div>
-            <div className="problem" style={{ fontSize: '1.25rem', background: 'rgba(240,246,255,0.90)' }}>
-              <math-field read-only style={{ fontSize: '1.2rem', background: 'transparent', color: 'inherit', border: 'none', width: '100%' }}>
+            <div className="problem solve-question-problem" style={{ fontSize: '1.25rem' }}>
+              <math-field className="solve-question-field" read-only style={{ fontSize: '1.2rem', background: 'transparent', color: 'inherit', border: 'none', width: '100%' }}>
                 {question.problem_expr}
               </math-field>
               {question.problem_image && (
@@ -194,14 +253,23 @@ export default function SolutionPage() {
                 <h3 className="solver-title">Explanation</h3>
               </div>
             </div>
-            <div className="solver-panel-body" style={{ padding: '30px 34px', gap: '22px', lineHeight: 1.8 }}>
-              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '1rem' }}>{data.explanation}</p>
+            <div className="solver-panel-body solution-explanation-body" style={{ padding: '30px 34px', gap: '22px', lineHeight: 1.8 }}>
+              <p className="solution-explanation-copy" style={{ margin: 0 }}>{data.explanation}</p>
               {(data.steps || []).length > 0 && (
-                <div className="solution-list solution-list-always-open">
+                <div className="solution-list solution-list-always-open solution-worked-list">
                   {data.steps.map((step, index) => (
                     <div key={`${index}-${step}`} className="solution-step">
                       <div className="solution-step-index">{index + 1}</div>
-                      <div className="solution-step-detail">{step}</div>
+                      <div className="solution-step-detail solution-step-lines">
+                        {splitWorkedStep(step).map((line, lineIndex) => (
+                          <span className="solution-step-line-text" key={`${index}-${lineIndex}`}>
+                            {line}
+                          </span>
+                        ))}
+                        <span className="solution-step-explain">
+                          {explainWorkedStep(step, index)}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

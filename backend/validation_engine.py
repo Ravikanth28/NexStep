@@ -3,6 +3,7 @@ SymPy-based step validation engine for integral calculus and related topics.
 """
 import ast
 import re
+from fractions import Fraction
 
 from sympy import (
     E,
@@ -2480,6 +2481,213 @@ def validate_steps(steps: list[str], problem_expr_str: str, problem_type: str = 
     return validate_general_steps(steps, problem_expr_str)
 
 
+def _format_probability_fraction(favorable: int, total: int) -> str:
+    if total <= 0:
+        return ""
+    value = Fraction(favorable, total)
+    if value.denominator == 1:
+        return str(value.numerator)
+    return f"{value.numerator}/{value.denominator}"
+
+
+def _stats_worked_solution(problem_expr_str: str) -> tuple[list[dict], str | None]:
+    """Create concrete worked probability steps for common elementary cases."""
+    lowered = (problem_expr_str or "").lower()
+
+    def build(event_name: str, sample_space: str, favorable_set: str, favorable: int, total: int, count_note: str) -> tuple[list[dict], str]:
+        simplified = _format_probability_fraction(favorable, total)
+        raw_fraction = f"{favorable}/{total}"
+        steps = [
+            {
+                "step": 1,
+                "title": "List the sample space",
+                "detail": f"S = {sample_space}, so n(S) = {total}.",
+            },
+            {
+                "step": 2,
+                "title": "List the favorable outcomes",
+                "detail": f"A = {favorable_set}, so n(A) = {favorable}. {count_note}",
+            },
+            {
+                "step": 3,
+                "title": "Use the probability formula",
+                "detail": "P(A) = n(A) / n(S).",
+            },
+            {
+                "step": 4,
+                "title": "Substitute the counts",
+                "detail": f"P({event_name}) = {raw_fraction}.",
+            },
+            {
+                "step": 5,
+                "title": "Simplify",
+                "detail": f"P({event_name}) = {simplified}.",
+            },
+        ]
+        return steps, simplified
+
+    if any(token in lowered for token in ["die", "dice"]):
+        if "even" in lowered:
+            return build(
+                "even number",
+                "{1, 2, 3, 4, 5, 6}",
+                "{2, 4, 6}",
+                3,
+                6,
+                "These are the even outcomes on one standard die.",
+            )
+        if "odd" in lowered:
+            return build(
+                "odd number",
+                "{1, 2, 3, 4, 5, 6}",
+                "{1, 3, 5}",
+                3,
+                6,
+                "These are the odd outcomes on one standard die.",
+            )
+        number_match = re.search(r"(?:getting|rolling|roll|draw(?:ing)?|number)\s+(?:a\s+)?([1-6])\b", lowered)
+        if number_match:
+            value = number_match.group(1)
+            return build(
+                value,
+                "{1, 2, 3, 4, 5, 6}",
+                "{" + value + "}",
+                1,
+                6,
+                f"Only one face shows {value}.",
+            )
+
+    if any(token in lowered for token in ["coin", "toss", "heads", "tails"]):
+        event = "heads" if "head" in lowered else "tails" if "tail" in lowered else "heads"
+        symbol = "H" if event == "heads" else "T"
+        return build(
+            event,
+            "{H, T}",
+            "{" + symbol + "}",
+            1,
+            2,
+            f"Only one outcome gives {event}.",
+        )
+
+    if any(token in lowered for token in ["card", "deck", "king", "queen", "ace", "jack"]):
+        rank_counts = {
+            "king": ("king", "the 4 kings", 4),
+            "queen": ("queen", "the 4 queens", 4),
+            "ace": ("ace", "the 4 aces", 4),
+            "jack": ("jack", "the 4 jacks", 4),
+        }
+        for token, (event_name, favorable_set, favorable) in rank_counts.items():
+            if token in lowered:
+                return build(
+                    event_name,
+                    "the 52 cards in a standard deck",
+                    favorable_set,
+                    favorable,
+                    52,
+                    f"There are {favorable} {event_name}s in a standard deck.",
+                )
+
+    return [], None
+
+
+def _parse_multiple_integral_problem(problem_expr_str: str):
+    """Extract integrand and bounds from common multiple-integral text forms."""
+    raw = (problem_expr_str or "").strip()
+    if not raw:
+        return None
+
+    sympy_match = re.search(r"integrate\s*\((.*)\)\s*$", raw, flags=re.IGNORECASE | re.DOTALL)
+    if sympy_match:
+        body = sympy_match.group(1)
+        tuple_matches = list(re.finditer(r"\(\s*([a-zA-Z])\s*,\s*([^,()]+)\s*,\s*([^,()]+)\s*\)", body))
+        if len(tuple_matches) >= 2:
+            integrand_text = body[:tuple_matches[0].start()].rstrip(" ,(").strip()
+            integrand_text = integrand_text or "1"
+            bounds = [
+                {
+                    "var": match.group(1).strip(),
+                    "lower": match.group(2).strip(),
+                    "upper": match.group(3).strip(),
+                }
+                for match in tuple_matches
+            ]
+            return integrand_text, bounds
+
+    normalized = raw.replace("\\,", " ").replace("{", "").replace("}", "")
+    normalized = normalized.replace("\\left", "").replace("\\right", "")
+    normalized = normalized.replace("\\int", "∫")
+    integral_matches = re.findall(r"∫\s*_\s*([^\s^]+)\s*\^\s*([^\s∫]+)", normalized)
+    differential_vars = re.findall(r"d\s*([a-zA-Z])", normalized)
+    if len(integral_matches) >= 2 and len(differential_vars) >= len(integral_matches):
+        last_integral_end = 0
+        for match in re.finditer(r"∫\s*_\s*[^\s^]+\s*\^\s*[^\s∫]+", normalized):
+            last_integral_end = match.end()
+        first_differential = re.search(r"\bd\s*[a-zA-Z]\b", normalized[last_integral_end:])
+        if not first_differential:
+            return None
+        integrand_text = normalized[last_integral_end:last_integral_end + first_differential.start()].strip() or "1"
+        outer_vars = list(reversed(differential_vars))
+        outer_bounds = [
+            {
+                "var": outer_vars[index],
+                "lower": lower.strip(),
+                "upper": upper.strip(),
+            }
+            for index, (lower, upper) in enumerate(integral_matches)
+        ]
+        return integrand_text, list(reversed(outer_bounds))
+
+    return None
+
+
+def _multiple_integral_worked_solution(problem_expr_str: str) -> tuple[list[dict], str | None]:
+    parsed = _parse_multiple_integral_problem(problem_expr_str)
+    if not parsed:
+        return [], None
+
+    integrand_text, bounds = parsed
+    if len(bounds) < 2:
+        return [], None
+
+    current = parse_expression_candidate(integrand_text)
+    if current is None:
+        return [], None
+
+    steps = [{
+        "step": 1,
+        "title": "Write the integral",
+        "detail": f"Start with integrand {format_expression(current)} and integrate from inside to outside.",
+    }]
+
+    try:
+        for index, bound in enumerate(bounds, start=2):
+            var_sym = symbols(bound["var"])
+            lower = parse_expression_candidate(bound["lower"])
+            upper = parse_expression_candidate(bound["upper"])
+            if lower is None or upper is None:
+                return [], None
+            before = current
+            current = simplify(integrate(current, (var_sym, lower, upper)))
+            steps.append({
+                "step": index,
+                "title": f"Integrate with respect to {bound['var']}",
+                "detail": (
+                    f"∫_{{{format_expression(lower)}}}^{{{format_expression(upper)}}} "
+                    f"{format_expression(before)} d{bound['var']} = {format_expression(current)}"
+                ),
+            })
+    except Exception:
+        return [], None
+
+    answer = format_expression(current)
+    steps.append({
+        "step": len(steps) + 1,
+        "title": "Final answer",
+        "detail": f"The value of the multiple integral is {answer}.",
+    })
+    return steps, answer
+
+
 def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str | None:
     """Compute the engine's correct answer for a problem without any student steps.
 
@@ -2500,6 +2708,10 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
 
     try:
         if resolved == "integral":
+            _, multiple_answer = _multiple_integral_worked_solution(problem_expr_str)
+            if multiple_answer is not None:
+                return multiple_answer
+
             preprocessed = preprocess_text(problem_expr_str)
             problem = parse_expression(preprocessed)
             if problem is None:
@@ -2556,7 +2768,8 @@ def compute_correct_answer(problem_expr_str: str, strategy: str = None) -> str |
             return "x = 2*sum(((-1)^(n+1)*sin(n*x))/n, (n,1,oo))"
 
         if resolved == "stats":
-            return None
+            _, stats_answer = _stats_worked_solution(problem_expr_str)
+            return stats_answer
 
         # General fallback
         parsed = parse_expression_candidate(problem_expr_str)
@@ -2589,6 +2802,10 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
     try:
         # ── INTEGRAL ─────────────────────────────────────────────────────────
         if resolved == "integral":
+            multiple_steps, _ = _multiple_integral_worked_solution(problem_expr_str)
+            if multiple_steps:
+                return multiple_steps
+
             preprocessed = preprocess_text(problem_expr_str)
             problem = parse_expression(preprocessed)
             if problem is None:
@@ -2825,29 +3042,8 @@ def generate_solution_steps(problem_expr_str: str, strategy: str = None) -> list
                 ]
 
         elif resolved == "stats":
-            if any(token in lowered for token in ["coin", "toss", "heads", "tails"]) and "heads" in lowered:
-                steps = [
-                    {"step": 1, "title": "List the sample space",
-                     "detail": "For one fair coin toss, write all equally likely outcomes."},
-                    {"step": 2, "title": "Count favorable outcomes",
-                     "detail": "Count the outcomes that match the requested event."},
-                    {"step": 3, "title": "Count total outcomes",
-                     "detail": "Count all equally likely outcomes in the sample space."},
-                    {"step": 4, "title": "Compute probability",
-                     "detail": "Use probability = favorable outcomes / total outcomes."},
-                ]
-            elif any(token in lowered for token in ["card", "deck", "king"]) and "king" in lowered:
-                steps = [
-                    {"step": 1, "title": "Identify the sample space",
-                     "detail": "Use the total number of equally likely cards in a standard deck."},
-                    {"step": 2, "title": "Count favorable outcomes",
-                     "detail": "Count how many cards match the requested rank."},
-                    {"step": 3, "title": "Write the probability formula",
-                     "detail": "P(king) = favorable outcomes / total outcomes."},
-                    {"step": 4, "title": "Compute probability",
-                     "detail": "Substitute the counts and simplify the fraction."},
-                ]
-            else:
+            steps, _ = _stats_worked_solution(problem_expr_str)
+            if not steps:
                 steps = [
                     {"step": 1, "title": "Identify the probability model",
                      "detail": "State the sample space, distribution, or event being measured."},

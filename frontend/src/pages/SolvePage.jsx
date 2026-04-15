@@ -373,8 +373,9 @@ export default function SolvePage() {
               <div className="badge badge-medium">{question.topic}</div>
               <div className="badge badge-hard">{question.difficulty}</div>
             </div>
-            <div className="problem" style={{ fontSize: '1.5rem', padding: '24px', background: 'rgba(240,246,255,0.90)', borderColor: 'rgba(46,60,181,0.25)' }}>
+            <div className="problem solve-question-problem" style={{ fontSize: '1.5rem', padding: '24px' }}>
               <math-field
+                className="solve-question-field"
                 read-only
                 style={{ fontSize: '1.4rem', background: 'transparent', color: 'inherit', border: 'none', width: '100%' }}
               >{question.problem_expr}</math-field>

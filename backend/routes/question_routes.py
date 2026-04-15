@@ -116,10 +116,7 @@ class NaturalQuestionFormatRequest(BaseModel):
 
 
 def _build_solution_fallback(question: Question, solution_steps: list[dict], correct_answer: str | None) -> str:
-    intro = (
-        f"Start by identifying the required method for {question.title}. "
-        "Then simplify the expression carefully and keep each algebraic step connected to the previous one."
-    )
+    intro = f"Here is the worked solution for {question.title}."
     step_text = " ".join(
         f"Step {step.get('step')}: {step.get('title')}. {step.get('detail')}"
         for step in solution_steps
@@ -313,11 +310,15 @@ async def get_question_solution(
     fallback = _build_solution_fallback(q, solution_steps, correct_answer)
 
     system_prompt = (
-        "You are a patient mathematics tutor. Explain the solution for a student. "
-        "Start with a clear text explanation before listing steps. "
+        "You are a patient mathematics tutor. Give the complete worked answer, not just an approach. "
+        "Start with one clear explanation sentence, then list the actual mathematical steps. "
+        "Every step must include concrete equations, substitutions, counts, or simplifications from the given reference. "
+        "Do NOT write generic instructions such as 'count favorable outcomes' unless you also provide the actual count. "
+        "Do NOT omit the final answer when correct_answer is provided. "
         "Keep it concise, friendly, and mathematically accurate. "
         "Return ONLY JSON with keys: explanation, steps, voice_script. "
-        "steps must be an array of short strings. voice_script should be natural spoken text."
+        "steps must be an array of short strings containing the worked calculation. "
+        "voice_script should be natural spoken text."
     )
     user_prompt = json.dumps({
         "title": q.title,
@@ -333,15 +334,29 @@ async def get_question_solution(
         f"{step.get('title')}: {step.get('detail')}"
         for step in solution_steps
     ]
+    if not step_strings and q.problem_image:
+        explanation = (
+            "This question was saved with an image, but the image was not converted into a parseable math expression. "
+            "The solution engine needs the integral as text, for example: integrate(1, (z, 0, y), (y, 0, x), (x, 0, 2))."
+        )
+        voice_script = explanation
+        step_strings = [
+            "The uploaded image is visible to students, but the backend cannot compute steps from the pixels alone.",
+            "Edit the question and use the image extraction tool, or enter the integral in text form.",
+        ]
 
     try:
-        raw = await get_ai_response(user_prompt, system_prompt)
-        parsed = _extract_json_object(raw)
-        if parsed:
-            explanation = parsed.get("explanation") or explanation
-            voice_script = parsed.get("voice_script") or explanation
-            if isinstance(parsed.get("steps"), list) and parsed["steps"]:
-                step_strings = [str(step) for step in parsed["steps"]]
+        if solution_steps or not q.problem_image:
+            raw = await get_ai_response(user_prompt, system_prompt)
+            parsed = _extract_json_object(raw)
+            if parsed:
+                explanation = parsed.get("explanation") or explanation
+                voice_script = parsed.get("voice_script") or explanation
+                if isinstance(parsed.get("steps"), list) and parsed["steps"]:
+                    candidate_steps = [str(step) for step in parsed["steps"]]
+                    candidate_text = " ".join(candidate_steps).lower()
+                    if not correct_answer or str(correct_answer).lower() in candidate_text:
+                        step_strings = candidate_steps
     except Exception:
         pass
 
